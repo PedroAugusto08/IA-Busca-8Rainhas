@@ -1,213 +1,224 @@
 """Maze
 
-Cada célula é representada por um token de 4 bits (N,S,E,W) opcionalmente seguido
-por 'S' (start) ou 'G' (goal). Ex: 1010, 1111S, 0101G. Apenas este formato é aceito.
+Formato de entrada (linhas no arquivo):
+	[row,col]:NSLO  # Letra
 
-Regras:
-  - Todas as linhas devem ter o mesmo número de tokens (grid retangular).
-  - Bits: '1' significa movimento permitido NAQUELA direção a partir da célula.
-  - neighbors() considera apenas a máscara da célula de origem (não checa reciprocidade).
-  - passable(): True se houver pelo menos um bit 1 (não totalmente bloqueada).
-  - Exatamente um token com S e um token com G devem existir.
-  - Erros levantam ValueError com mensagens claras.
+Onde:
+	- row, col começam em 0.
+	- NSLO são 4 bits (Norte, Sul, Leste, Oeste) com semântica:
+				1 = parede (movimento bloqueado naquela direção)
+				0 = livre (movimento permitido se célula destino existe)
+	- Comentário após '#' define a letra identificadora daquela célula (usada para visualização).
+	- Linhas em branco e linhas iniciadas por '#' são ignoradas.
+	- Linhas finais opcionais 'Start:[r,c]' e 'Goal:[r,c]' podem existir apenas para documentação;
+		as posições de start e goal são FIXAS (Start=(4,0), Goal=(0,4)). Se declaradas e divergirem,
+		gera erro.
+
+Movimento:
+	- neighbors() considera a máscara da célula de origem e produz vizinhos em ordem N,S,L,O
+		somente onde o bit correspondente == 0 (livre) e dentro dos limites.
+	- Não exige reciprocidade (se origem permite ir Leste, o destino não precisa permitir Oeste).
+
+Passabilidade:
+	- passable() retorna True se a célula possui ao menos um bit == 0 (tem alguma saída possível).
 
 Renderização (render_path):
-  - '.' para células normais não no caminho
-  - 'o' para células no caminho (exceto start/goal)
-  - 'S' e 'G' nas posições respectivas
+	- Sem caminho: imprime grade de letras (ou '.' se faltar letra, embora não esperado).
+	- Com caminho: 'S' e 'G' sobrescrevem letras nas posições de início e fim, e 'o' nas demais
+		posições do path.
 
+Erros: ValueError para qualquer inconsistência (formato, máscara inválida, posição duplicada,
+ausência de alguma célula do retângulo deduzido, declaração Start/Goal divergente).
 """
 from __future__ import annotations
 from pathlib import Path
-from typing import List, Tuple, Iterator, Union
+from typing import List, Tuple, Iterator, Union, Dict
 
 Pos = Tuple[int, int]
 
-_DIRS = [(-1, 0), (1, 0), (0, 1), (0, -1)]  # N, S, E, W (ordem fixa)
-
 
 class Maze:
-	"""Labirinto baseado em máscaras de adjacência (4 bits N,S,E,W)."""
+    START_POS: Pos = (4, 0)
+    GOAL_POS: Pos = (0, 4)
 
-	@classmethod
-	def from_file(cls, path: Union[Path, str]) -> "Maze":
-		p = Path(path)
-		if not p.is_file():
-			raise ValueError(f"Arquivo não encontrado: {path}")
+    @classmethod
+    def from_file(cls, path: Union[Path, str]) -> "Maze":
+        # Lê o arquivo texto e converte para estruturas internas (máscaras e letras)
+        # Valida formato e consistência do grid
+        p = Path(path)
+        if not p.is_file():
+            raise ValueError(f"Arquivo não encontrado: {path}")
+        with p.open('r', encoding='utf-8') as f:
+            lines = [ln.rstrip('\n') for ln in f]
 
-		with p.open("r", encoding="utf-8") as f:
-			raw_lines = [ln.rstrip("\n") for ln in f]
+        body: List[str] = []
+        start_decl = None
+        goal_decl = None
+        for ln in lines:
+            stripped = ln.strip()
+            if not stripped:
+                # Ignora linhas em branco
+                continue
+            if stripped.startswith('#'):
+                # Comentário puro é ignorado
+                continue
+            if stripped.startswith('Start:'):
+                # Armazena declaração (para validar depois)
+                start_decl = stripped
+                continue
+            if stripped.startswith('Goal:'):
+                # Armazena declaração (para validar depois)
+                goal_decl = stripped
+                continue
+            body.append(stripped)
 
-		# Remove linhas externas vazias
-		while raw_lines and not raw_lines[0].strip():
-			raw_lines.pop(0)
-		while raw_lines and not raw_lines[-1].strip():
-			raw_lines.pop()
+        cells: Dict[Pos, Tuple[int,int,int,int]] = {}
+        letters: Dict[Pos, str] = {}
+        max_r = -1
+        max_c = -1
 
-		if not raw_lines:
-			raise ValueError("Arquivo vazio ou somente linhas em branco.")
+        for line in body:
+            try:
+                left, *comment = line.split('#', 1)
+                left = left.strip()
+                letter = comment[0].strip() if comment else '.'
+                # Formato esperado da parte principal: [r,c]:NSLO
+                if not left.startswith('[') or ']' not in left or ':' not in left:
+                    raise ValueError('Formato de célula inválido')
+                coord_part, mask_part = left.split(':', 1)
+                inside = coord_part[1:coord_part.index(']')]
+                r_str, c_str = inside.split(',')
+                r = int(r_str)
+                c = int(c_str)
+                mask_part = mask_part.strip()
+                if len(mask_part) != 4 or any(ch not in '01' for ch in mask_part):
+                    raise ValueError(f"Máscara inválida '{mask_part}' em {coord_part}")
+                n, s, l, o = (int(b) for b in mask_part)
+            except ValueError as e:
+                raise ValueError(f"Linha inválida: '{line}' ({e})") from None
 
-		# Tokenização por espaço
-		token_lines: List[List[str]] = []
-		for line in raw_lines:
-			if not line.strip():
-				continue
-			tokens = line.strip().split()
-			token_lines.append(tokens)
+            pos = (r, c)
+            if pos in cells:
+                raise ValueError(f"Posição duplicada {pos}.")
+            cells[pos] = (n, s, l, o)
+            letters[pos] = letter if letter else '.'
+            max_r = max(max_r, r)
+            max_c = max(max_c, c)
 
-		# Valida retangularidade (mesmo número de tokens por linha)
-		width_set = {len(tl) for tl in token_lines}
-		if len(width_set) != 1:
-			raise ValueError("Linhas com número de tokens diferentes (grid não retangular).")
+        if max_r < 0:
+            raise ValueError('Nenhuma célula encontrada.')
 
-		return cls(token_lines)
+        height = max_r + 1
+        width = max_c + 1
+        for rr in range(height):
+            for cc in range(width):
+                if (rr, cc) not in cells:
+                    # Se qualquer célula do retângulo deduzido estiver ausente -> erro
+                    raise ValueError(f"Posição ausente no grid: ({rr},{cc}).")
+                
+		# Start e Goal são fixos, mas se declarados devem ser validados
+        def parse_decl(decl: str) -> Pos:
+            inside = decl.split(':',1)[1].strip()
+            if not inside.startswith('[') or not inside.endswith(']'):
+                raise ValueError(f"Declaração inválida: {decl}")
+            inner = inside[1:-1]
+            a,b = inner.split(',')
+            return (int(a), int(b))
 
-	def __init__(self, tokens_grid: List[List[str]]):
+        if start_decl and parse_decl(start_decl) != cls.START_POS:
+            raise ValueError('Start declarado não corresponde à posição fixa.')
+        if goal_decl and parse_decl(goal_decl) != cls.GOAL_POS:
+            raise ValueError('Goal declarado não corresponde à posição fixa.')
 
-		if not tokens_grid:
-			raise ValueError("Grid vazio.")
+        return cls(height, width, cells, letters)
 
-		self._height = len(tokens_grid)
-		self._width = len(tokens_grid[0])
+    def __init__(self, height: int, width: int, cells: Dict[Pos, Tuple[int,int,int,int]], letters: Dict[Pos,str]):
+        # Monta matrizes internas de máscaras (bits) e letras indexadas por (r,c)
+        self._height = height
+        self._width = width
+        self._masks: List[List[Tuple[int,int,int,int]]] = [
+            [cells[(r,c)] for c in range(width)] for r in range(height)
+        ]
+        self._letters: List[List[str]] = [
+            [letters[(r,c)] for c in range(width)] for r in range(height)
+        ]
+        self._start: Pos = self.START_POS
+        self._goal: Pos = self.GOAL_POS
+        if not self.in_bounds(self._start) or not self.in_bounds(self._goal):
+            raise ValueError('Start ou Goal fora dos limites.')
 
-		# Estrutura: armazenar uma matriz de listas [n,s,e,w] ints (0/1)
-		self._masks: List[List[Tuple[int, int, int, int]]] = []
-		start_pos: Pos | None = None
-		goal_pos: Pos | None = None
-		s_count = 0
-		g_count = 0
+    # API pública
+    def start(self) -> Pos:
+        return self._start
 
-		for r, row_tokens in enumerate(tokens_grid):
-			if len(row_tokens) != self._width:
-				raise ValueError("Inconsistência de largura detectada durante parsing.")
-			row_masks: List[Tuple[int, int, int, int]] = []
-			for c, token in enumerate(row_tokens):
-				# Token base: primeiros 4 chars devem ser 0/1
-				if len(token) < 4:
-					raise ValueError(f"Token inválido (menos de 4 chars) '{token}' em ({r},{c}).")
-				base = token[:4]
-				if any(ch not in '01' for ch in base):
-					raise ValueError(f"Token contém bit inválido '{token}' em ({r},{c}).")
-				flags = token[4:]  # sufixo pode estar vazio ou conter S/G
+    def goal(self) -> Pos:
+        return self._goal
 
-				# Analisa sufixo
-				if flags:
-					# Não permitir caracteres diferentes de S/G ou repetição
-					for ch in flags:
-						if ch not in 'SG':
-							raise ValueError(f"Sufixo inválido '{flags}' em token '{token}' ({r},{c}).")
-					if 'S' in flags:
-						s_count += 1
-						if start_pos is None:
-							start_pos = (r, c)
-					if 'G' in flags:
-						g_count += 1
-						if goal_pos is None:
-							goal_pos = (r, c)
-					# Impedir múltiplos S ou G no mesmo token (ex: 1111SS)
-					if flags.count('S') > 1 or flags.count('G') > 1:
-						raise ValueError(f"Sufixo repetido em token '{token}' ({r},{c}).")
+    def in_bounds(self, pos: Pos) -> bool:
+        # Verifica se (r,c) está dentro dos limites gerais do grid
+        r,c = pos
+        return 0 <= r < self._height and 0 <= c < self._width
 
-				n, s, e, w = (int(b) for b in base)
-				row_masks.append((n, s, e, w))
-			self._masks.append(row_masks)
+    def passable(self, pos: Pos) -> bool:
+        # Célula é considerada passável se tiver pelo menos uma direção livre (bit 0)
+        n,s,l,o = self._masks[pos[0]][pos[1]]
+        return (n==0) or (s==0) or (l==0) or (o==0)
 
-		if s_count != 1 or g_count != 1 or start_pos is None or goal_pos is None:
-			raise ValueError(f"Esperado exatamente um S e um G; encontrados S={s_count}, G={g_count}.")
+    def neighbors(self, pos: Pos) -> Iterator[Pos]:
+        # Gera vizinhos em ordem determinística N,S,L,O conforme bits livres
+        r,c = pos
+        n,s,l,o = self._masks[r][c]
+        if n == 0 and r-1 >= 0:
+            yield (r-1, c)
+        if s == 0 and r+1 < self._height:
+            yield (r+1, c)
+        if l == 0 and c+1 < self._width:
+            yield (r, c+1)
+        if o == 0 and c-1 >= 0:
+            yield (r, c-1)
 
-		self._start: Pos = start_pos  # type: ignore[assignment]
-		self._goal: Pos = goal_pos    # type: ignore[assignment]
+    def step_cost(self, from_pos: Pos, to_pos: Pos) -> int:
+        return 1
 
-	# ------------------- API pública -------------------
-	def start(self) -> Pos:
-		# Retorna posição start (linha,coluna).
-		return self._start
+    def render_path(self, path: List[Pos]) -> str:
+        # Cria uma cópia da grade de letras e sobrepõe marcações do caminho
+        # 'S' e 'G' sobrescrevem suas posições, 'o' para cada passo intermediário
+        out = [row[:] for row in self._letters]
+        sr,sc = self._start
+        gr,gc = self._goal
+        out[sr][sc] = 'S'
+        out[gr][gc] = 'G'
+        for (r,c) in path:
+            if not self.in_bounds((r,c)):
+                raise ValueError(f"Posição fora dos limites no path: {r},{c}")
+            if (r,c) not in (self._start, self._goal):
+                out[r][c] = 'o'
+        return '\n'.join(' '.join(ch for ch in row) for row in out)
 
-	def goal(self) -> Pos:
-		# Retorna posição goal (linha,coluna).
-		return self._goal
+    def __repr__(self) -> str:
+        return f"MazeNSLO(height={self._height}, width={self._width}, start={self._start}, goal={self._goal})"
 
-	def in_bounds(self, pos: Pos) -> bool:
-		# True se a posição está dentro dos limites.
-		r, c = pos
-		return 0 <= r < self._height and 0 <= c < self._width
-
-	def passable(self, pos: Pos) -> bool:
-		# True se a célula tem ao menos um movimento permitido (não bloqueada).
-		r, c = pos
-		n, s, e, w = self._masks[r][c]
-		return (n + s + e + w) > 0
-
-	def neighbors(self, pos: Pos) -> Iterator[Pos]:
-		# Itera vizinhos permitidos pela máscara da célula de origem na ordem N,S,E,W.
-		r, c = pos
-		n, s, e, w = self._masks[r][c]
-		# N
-		if n and r - 1 >= 0:
-			yield (r - 1, c)
-		# S
-		if s and r + 1 < self._height:
-			yield (r + 1, c)
-		# E
-		if e and c + 1 < self._width:
-			yield (r, c + 1)
-		# W
-		if w and c - 1 >= 0:
-			yield (r, c - 1)
-
-	def step_cost(self, from_pos: Pos, to_pos: Pos) -> int:
-		# Custo uniforme de movimento (sempre 1).
-		return 1
-
-	def render_path(self, path: List[Pos]) -> str:
-		# Gera string visual com S, G, 'o' no caminho e '.' demais células.
-		# Matriz base de '.'
-		out = [['.' for _ in range(self._width)] for _ in range(self._height)]
-		sr, sc = self._start
-		gr, gc = self._goal
-		out[sr][sc] = 'S'
-		out[gr][gc] = 'G'
-
-		for (r, c) in path:
-			if not self.in_bounds((r, c)):
-				raise ValueError(f"Path inválido: posição ({r},{c}) fora dos limites.")
-			if (r, c) not in (self._start, self._goal):
-				out[r][c] = 'o'
-
-		return "\n".join("".join(row) for row in out)
-
-	# ------------------- Representações -------------------
-	def __repr__(self) -> str:
-		return f"MazeAdj(height={self._height}, width={self._width}, start={self._start}, goal={self._goal})"
-
-	def __str__(self) -> str:
-		# Exibe apenas a máscara base (sem S/G) para inspeção rápida
-		lines = []
-		for r in range(self._height):
-			row_parts = []
-			for c in range(self._width):
-				n, s, e, w = self._masks[r][c]
-				base = f"{n}{s}{e}{w}"
-				if (r, c) == self._start:
-					base += 'S'
-				if (r, c) == self._goal:
-					base += 'G'
-				row_parts.append(base)
-			lines.append(" ".join(row_parts))
-		return "\n".join(lines)
+    def __str__(self) -> str:
+        # Representação textual: mostra bits e letra (ex.: 1001:A)
+        lines = []
+        for r in range(self._height):
+            parts = []
+            for c in range(self._width):
+                n,s,l,o = self._masks[r][c]
+                letter = self._letters[r][c]
+                parts.append(f"{n}{s}{l}{o}:{letter}")
+            lines.append(' '.join(parts))
+        return '\n'.join(lines)
 
 
-if __name__ == "__main__":  # Demo simples
-	demo_file = Path(__file__).resolve().parents[1] / 'data' / 'labirinto.txt'
-	if demo_file.exists():
-		try:
-			m = Maze.from_file(demo_file)
-			print("Labirinto carregado:")
-			print(m)
-			print("Start:", m.start(), "Goal:", m.goal())
-			print("Vizinhos de start:", list(m.neighbors(m.start())))
-			print("Render vazio:\n", m.render_path([]))
-		except ValueError as e:
-			print("Erro:", e)
-	else:
-		print("Arquivo de demo não encontrado:", demo_file)
+if __name__ == '__main__': # Teste simples
+    demo_file = Path(__file__).resolve().parents[1] / 'data' / 'labirinto.txt'
+    try:
+        m = Maze.from_file(demo_file)
+        print('Maze carregado:')
+        print(m)
+        print('Start:', m.start(), 'Goal:', m.goal())
+        print('Vizinhos Start:', list(m.neighbors(m.start())))
+        print('Render vazio:\n' + m.render_path([]))
+    except ValueError as e:
+        print('Erro ao carregar maze:', e)
