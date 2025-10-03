@@ -1,6 +1,4 @@
-"""Search
-
-Algoritmos de busca não informada (BFS e DFS).
+"""Algoritmos de busca não informada (BFS e DFS) para o Maze NSLO.
 
 Contrato das funções:
 	- bfs(maze) -> list[Pos]
@@ -73,7 +71,7 @@ def bfs(maze) -> List[Pos]:
 def dfs(maze) -> List[Pos]:
 	# DFS (Depth-First Search) iterativa com pilha.
 	# Não garante caminho mínimo; segue profundidade respeitando ordem N,S,L,O.
-	# Reverte vizinhos para explorar na ordem natural N,S,L,O.
+	# Inserimos vizinhos em ordem reversa na pilha para explorar primeiro o Norte.
 	start = maze.start()
 	goal = maze.goal()
 	if start == goal:
@@ -87,7 +85,7 @@ def dfs(maze) -> List[Pos]:
 		current = stack.pop()
 		if current == goal:
 			break
-		# Listar antes para poder reverter a ordem de push
+		# Precisamos listar antes para poder reverter a ordem de push
 		neighbors_list = list(maze.neighbors(current))
 		# Reverte para que o primeiro da ordem original seja explorado primeiro ao usar pilha
 		for nb in reversed(neighbors_list):
