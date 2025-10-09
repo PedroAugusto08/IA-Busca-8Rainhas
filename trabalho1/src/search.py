@@ -29,6 +29,8 @@ from itertools import count
 if TYPE_CHECKING:
 	# Import apenas para análise estática, evitando acoplamento em tempo de execução
 	from .maze import Maze
+	# Heurísticas para type hint (opcional)
+	from .heuristics import manhattan as _manhattan_hint, euclidean as _euclidean_hint
 
 Pos = Tuple[int,int]
 
@@ -107,7 +109,7 @@ def dfs(maze: "Maze") -> List[Pos]:
 __all__ = ["bfs", "dfs"]
 
 
-def astar(maze: "Maze", h: Optional[Callable[[Pos, Pos], int]] = None) -> List[Pos]:
+def astar(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = None) -> List[Pos]:
 	# A* com fila de prioridade por f(n) = g(n) + h(n).
 	# h padrão: distância Manhattan até o goal.
 	# Retorna caminho do start ao goal; [] se falha.
@@ -117,9 +119,13 @@ def astar(maze: "Maze", h: Optional[Callable[[Pos, Pos], int]] = None) -> List[P
 		return [start]
 
 	# Heurística (Manhattan) padrão
-	def _manhattan(a: Pos, b: Pos) -> int:
-		return abs(a[0] - b[0]) + abs(a[1] - b[1])
-	heuristic = h or _manhattan
+	try:
+		from .heuristics import manhattan as default_h
+	except Exception:
+		# Fallback local se o import falhar por algum motivo
+		def default_h(a: Pos, b: Pos) -> float:
+			return float(abs(a[0] - b[0]) + abs(a[1] - b[1]))
+	heuristic = h or default_h
 
 	# Estruturas
 	open_heap: List[Tuple[int, int, Pos]] = []  # (f, tie, node)
