@@ -22,7 +22,13 @@ Edge cases abordados:
 """
 from __future__ import annotations
 from collections import deque
-from typing import Dict, List, Tuple, Iterable
+from typing import Dict, List, Tuple, Optional, Callable, TYPE_CHECKING
+import heapq
+from itertools import count
+
+if TYPE_CHECKING:
+	# Import apenas para análise estática, evitando acoplamento em tempo de execução
+	from .maze import Maze
 
 Pos = Tuple[int,int]
 
@@ -42,7 +48,7 @@ def _reconstruct_path(came_from: Dict[Pos, Pos], start: Pos, goal: Pos) -> List[
 	return rev
 
 
-def bfs(maze) -> List[Pos]:
+def bfs(maze: "Maze") -> List[Pos]:
 	# BFS (Breadth-First Search): garante menor número de passos.
 	# Estruturas: fila (deque), conjunto visited, mapa came_from.
 	start = maze.start()
@@ -68,7 +74,7 @@ def bfs(maze) -> List[Pos]:
 	return _reconstruct_path(came_from, start, goal)
 
 
-def dfs(maze) -> List[Pos]:
+def dfs(maze: "Maze") -> List[Pos]:
 	# DFS (Depth-First Search) iterativa com pilha.
 	# Não garante caminho mínimo; segue profundidade respeitando ordem N,S,L,O.
 	# Inserimos vizinhos em ordem reversa na pilha para explorar primeiro o Norte.
@@ -99,4 +105,59 @@ def dfs(maze) -> List[Pos]:
 
 
 __all__ = ["bfs", "dfs"]
+
+
+def astar(maze: "Maze", h: Optional[Callable[[Pos, Pos], int]] = None) -> List[Pos]:
+	# A* com fila de prioridade por f(n) = g(n) + h(n).
+	# h padrão: distância Manhattan até o goal.
+	# Retorna caminho do start ao goal; [] se falha.
+	start = maze.start()
+	goal = maze.goal()
+	if start == goal:
+		return [start]
+
+	# Heurística (Manhattan) padrão
+	def _manhattan(a: Pos, b: Pos) -> int:
+		return abs(a[0] - b[0]) + abs(a[1] - b[1])
+	heuristic = h or _manhattan
+
+	# Estruturas
+	open_heap: List[Tuple[int, int, Pos]] = []  # (f, tie, node)
+	g_score: Dict[Pos, int] = {start: 0}
+	came_from: Dict[Pos, Pos] = {}
+	closed: set[Pos] = set()
+	push_counter = count()
+
+	start_f = heuristic(start, goal)
+	heapq.heappush(open_heap, (start_f, next(push_counter), start))
+
+	# Melhor f(n) conhecido para cada nó (para ignorar entradas obsoletas na heap)
+	best_f: Dict[Pos, int] = {start: start_f}
+
+	while open_heap:
+		f_cur, _, current = heapq.heappop(open_heap)
+		# Ignora entradas obsoletas
+		if best_f.get(current, float('inf')) < f_cur:
+			continue
+		if current == goal:
+			return _reconstruct_path(came_from, start, goal)
+		closed.add(current)
+
+		for nb in maze.neighbors(current):
+			if nb in closed:
+				continue
+			step = maze.step_cost(current, nb)
+			cand_g = g_score[current] + step
+			if cand_g < g_score.get(nb, float('inf')):
+				came_from[nb] = current
+				g_score[nb] = cand_g
+				f_nb = cand_g + heuristic(nb, goal)
+				best_f[nb] = f_nb
+				heapq.heappush(open_heap, (f_nb, next(push_counter), nb))
+
+	# Falha: sem caminho
+	return []
+
+
+__all__ = ["bfs", "dfs", "astar"]
 
