@@ -167,3 +167,53 @@ def astar(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = None) -> List
 
 __all__ = ["bfs", "dfs", "astar"]
 
+
+def greedy_best_first(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = None) -> List[Pos]:
+	# Greedy Best-First Search: fronteira ordenada apenas por h(n).
+	# Não considera g(n); não garante ótimo e pode ficar preso em becos mais facilmente.
+	start = maze.start()
+	goal = maze.goal()
+	if start == goal:
+		return [start]
+
+	# Heurística padrão (Manhattan)
+	try:
+		from .heuristics import manhattan as default_h
+	except Exception:
+		def default_h(a: Pos, b: Pos) -> float:
+			return float(abs(a[0] - b[0]) + abs(a[1] - b[1]))
+	heuristic = h or default_h
+
+	open_heap: List[Tuple[float, int, Pos]] = []  # (h, tie, node)
+	came_from: Dict[Pos, Pos] = {}
+	visited: set[Pos] = set()
+	push_counter = count()
+
+	start_h = heuristic(start, goal)
+	heapq.heappush(open_heap, (start_h, next(push_counter), start))
+
+	best_h: Dict[Pos, float] = {start: start_h}
+
+	while open_heap:
+		cur_h, _, current = heapq.heappop(open_heap)
+		# Ignora entradas obsoletas
+		if best_h.get(current, float('inf')) < cur_h:
+			continue
+		if current == goal:
+			return _reconstruct_path(came_from, start, goal)
+		visited.add(current)
+
+		for nb in maze.neighbors(current):
+			if nb in visited:
+				continue
+			new_h = heuristic(nb, goal)
+			if new_h < best_h.get(nb, float('inf')):
+				best_h[nb] = new_h
+				came_from[nb] = current
+				heapq.heappush(open_heap, (new_h, next(push_counter), nb))
+
+	return []
+
+
+__all__ = ["bfs", "dfs", "astar", "greedy_best_first"]
+
