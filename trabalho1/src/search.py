@@ -22,9 +22,11 @@ Edge cases abordados:
 """
 from __future__ import annotations
 from collections import deque
-from typing import Dict, List, Tuple, Optional, Callable, TYPE_CHECKING
+from typing import Dict, List, Tuple, Optional, Callable, TYPE_CHECKING, Union
 import heapq
 from itertools import count
+from time import perf_counter
+from dataclasses import dataclass
 
 if TYPE_CHECKING:
 	# Import apenas para análise estática, evitando acoplamento em tempo de execução
@@ -50,13 +52,85 @@ def _reconstruct_path(came_from: Dict[Pos, Pos], start: Pos, goal: Pos) -> List[
 	return rev
 
 
-def bfs(maze: "Maze") -> List[Pos]:
+class MetricsRecorder:
+	"""Utilitário para registrar métricas de busca de forma unificada.
+
+	Mantém a contagem de nós expandidos/gerados e os picos de estruturas
+	(fronteira e explorados) e monta o SearchMetrics no final, preservando
+	exatamente os valores esperados pelos algoritmos atuais.
+	"""
+
+	def __init__(
+		self,
+		algorithm: str,
+		enabled: bool,
+		compute_optimality: bool,
+		*,
+		initial_frontier: int = 0,
+		initial_explored: int = 0,
+	):
+		self.algorithm = algorithm
+		self.enabled = enabled
+		self.compute_optimality = compute_optimality
+		self.t0 = perf_counter() if enabled else 0.0
+		self.expanded = 0
+		self.generated = 0
+		self.max_frontier = initial_frontier if enabled else 0
+		self.max_explored = initial_explored if enabled else 0
+
+	def inc_expanded(self) -> None:
+		if self.enabled:
+			self.expanded += 1
+
+	def inc_generated(self) -> None:
+		if self.enabled:
+			self.generated += 1
+
+	def track_frontier(self, size: int) -> None:
+		if self.enabled and size > self.max_frontier:
+			self.max_frontier = size
+
+	def track_explored(self, size: int) -> None:
+		if self.enabled and size > self.max_explored:
+			self.max_explored = size
+
+	def finalize(self, maze: "Maze", path: List[Pos]) -> "SearchMetrics":
+		assert self.enabled, "finalize() chamado sem métricas habilitadas"
+		t1 = perf_counter()
+		found = len(path) > 0
+		completeness: Optional[bool]
+		optimal: Optional[bool]
+		completeness = optimal = None
+		if self.compute_optimality:
+			completeness, optimal = _eval_completeness_and_optimality(maze, path)
+		return SearchMetrics(
+			algorithm=self.algorithm,
+			time_sec=t1 - self.t0,
+			expanded=self.expanded,
+			generated=self.generated,
+			max_frontier=self.max_frontier,
+			max_explored=self.max_explored,
+			max_structures=self.max_frontier + self.max_explored,
+			found=found,
+			completeness=completeness,
+			optimal=optimal,
+			path_cost=max(0, len(path) - 1),
+			path_len=len(path),
+		)
+
+
+def bfs(maze: "Maze", with_metrics: bool = False, compute_optimality: bool = False) -> Union[List[Pos], Tuple[List[Pos], "SearchMetrics"]]:
 	# BFS (Breadth-First Search): garante menor número de passos.
 	# Estruturas: fila (deque), conjunto visited, mapa came_from.
 	start = maze.start()
 	goal = maze.goal()
+	rec = MetricsRecorder("BFS", with_metrics, compute_optimality, initial_frontier=1, initial_explored=1)
 	if start == goal:
-		return [start]
+		path = [start]
+		if not with_metrics:
+			return path
+		# Mantém métricas idênticas ao caso trivial anterior (frontier=1, explored=1)
+		return path, rec.finalize(maze, path)
 
 	queue = deque([start])
 	visited = {start}
@@ -64,6 +138,7 @@ def bfs(maze: "Maze") -> List[Pos]:
 
 	while queue:
 		current = queue.popleft()
+		rec.inc_expanded()
 		if current == goal:
 			break
 		for nb in maze.neighbors(current):
@@ -72,18 +147,28 @@ def bfs(maze: "Maze") -> List[Pos]:
 			visited.add(nb)
 			came_from[nb] = current
 			queue.append(nb)
+			rec.inc_generated()
+			rec.track_frontier(len(queue))
+			rec.track_explored(len(visited))
 
-	return _reconstruct_path(came_from, start, goal)
+	path = _reconstruct_path(came_from, start, goal)
+	if not with_metrics:
+		return path
+	return path, rec.finalize(maze, path)
 
 
-def dfs(maze: "Maze") -> List[Pos]:
+def dfs(maze: "Maze", with_metrics: bool = False, compute_optimality: bool = False) -> Union[List[Pos], Tuple[List[Pos], "SearchMetrics"]]:
 	# DFS (Depth-First Search) iterativa com pilha.
 	# Não garante caminho mínimo; segue profundidade respeitando ordem N,S,L,O.
 	# Inserimos vizinhos em ordem reversa na pilha para explorar primeiro o Norte.
 	start = maze.start()
 	goal = maze.goal()
+	rec = MetricsRecorder("DFS", with_metrics, compute_optimality, initial_frontier=1, initial_explored=1)
 	if start == goal:
-		return [start]
+		path = [start]
+		if not with_metrics:
+			return path
+		return path, rec.finalize(maze, path)
 
 	stack: List[Pos] = [start]
 	visited = {start}
@@ -91,6 +176,7 @@ def dfs(maze: "Maze") -> List[Pos]:
 
 	while stack:
 		current = stack.pop()
+		rec.inc_expanded()
 		if current == goal:
 			break
 		# Precisamos listar antes para poder reverter a ordem de push
@@ -102,21 +188,31 @@ def dfs(maze: "Maze") -> List[Pos]:
 			visited.add(nb)
 			came_from[nb] = current
 			stack.append(nb)
+			rec.inc_generated()
+			rec.track_frontier(len(stack))
+			rec.track_explored(len(visited))
 
-	return _reconstruct_path(came_from, start, goal)
+	path = _reconstruct_path(came_from, start, goal)
+	if not with_metrics:
+		return path
+	return path, rec.finalize(maze, path)
 
 
 __all__ = ["bfs", "dfs"]
 
 
-def astar(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = None) -> List[Pos]:
+def astar(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = None, with_metrics: bool = False, compute_optimality: bool = False) -> Union[List[Pos], Tuple[List[Pos], "SearchMetrics"]]:
 	# A* com fila de prioridade por f(n) = g(n) + h(n).
 	# h padrão: distância Manhattan até o goal.
 	# Retorna caminho do start ao goal; [] se falha.
 	start = maze.start()
 	goal = maze.goal()
+	rec = MetricsRecorder("A*", with_metrics, compute_optimality, initial_frontier=1, initial_explored=0)
 	if start == goal:
-		return [start]
+		path = [start]
+		if not with_metrics:
+			return path
+		return path, rec.finalize(maze, path)
 
 	# Heurística (Manhattan) padrão
 	try:
@@ -133,6 +229,7 @@ def astar(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = None) -> List
 	came_from: Dict[Pos, Pos] = {}
 	closed: set[Pos] = set()
 	push_counter = count()
+	# contadores via recorder; max_frontier inicia em 1, explored em 0
 
 	start_f = heuristic(start, goal)
 	heapq.heappush(open_heap, (start_f, next(push_counter), start))
@@ -145,9 +242,11 @@ def astar(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = None) -> List
 		# Ignora entradas obsoletas
 		if best_f.get(current, float('inf')) < f_cur:
 			continue
+		rec.inc_expanded()
 		if current == goal:
-			return _reconstruct_path(came_from, start, goal)
+			break
 		closed.add(current)
+		rec.track_explored(len(closed))
 
 		for nb in maze.neighbors(current):
 			if nb in closed:
@@ -160,21 +259,30 @@ def astar(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = None) -> List
 				f_nb = cand_g + heuristic(nb, goal)
 				best_f[nb] = f_nb
 				heapq.heappush(open_heap, (f_nb, next(push_counter), nb))
+				rec.inc_generated()
+				rec.track_frontier(len(open_heap))
 
-	# Falha: sem caminho
-	return []
+	# Falha ou sucesso: reconstruir
+	path = _reconstruct_path(came_from, start, goal)
+	if not with_metrics:
+		return path
+	return path, rec.finalize(maze, path)
 
 
 __all__ = ["bfs", "dfs", "astar"]
 
 
-def greedy_best_first(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = None) -> List[Pos]:
+def greedy_best_first(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = None, with_metrics: bool = False, compute_optimality: bool = False) -> Union[List[Pos], Tuple[List[Pos], "SearchMetrics"]]:
 	# Greedy Best-First Search: fronteira ordenada apenas por h(n).
 	# Não considera g(n); não garante ótimo e pode ficar preso em becos mais facilmente.
 	start = maze.start()
 	goal = maze.goal()
+	rec = MetricsRecorder("Greedy", with_metrics, compute_optimality, initial_frontier=1, initial_explored=0)
 	if start == goal:
-		return [start]
+		path = [start]
+		if not with_metrics:
+			return path
+		return path, rec.finalize(maze, path)
 
 	# Heurística padrão (Manhattan)
 	try:
@@ -188,6 +296,7 @@ def greedy_best_first(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = N
 	came_from: Dict[Pos, Pos] = {}
 	visited: set[Pos] = set()
 	push_counter = count()
+	# contadores via recorder; max_frontier inicia em 1, explored em 0
 
 	start_h = heuristic(start, goal)
 	heapq.heappush(open_heap, (start_h, next(push_counter), start))
@@ -199,8 +308,9 @@ def greedy_best_first(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = N
 		# Ignora entradas obsoletas
 		if best_h.get(current, float('inf')) < cur_h:
 			continue
+		rec.inc_expanded()
 		if current == goal:
-			return _reconstruct_path(came_from, start, goal)
+			break
 		visited.add(current)
 
 		for nb in maze.neighbors(current):
@@ -211,8 +321,45 @@ def greedy_best_first(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = N
 				best_h[nb] = new_h
 				came_from[nb] = current
 				heapq.heappush(open_heap, (new_h, next(push_counter), nb))
+				rec.inc_generated()
+				rec.track_frontier(len(open_heap))
+	path = _reconstruct_path(came_from, start, goal)
+	if not with_metrics:
+		return path
+	return path, rec.finalize(maze, path)
 
-	return []
+
+__all__ = ["bfs", "dfs", "astar", "greedy_best_first"]
+
+
+# ===================== Métricas de desempenho =====================
+
+@dataclass
+class SearchMetrics:
+	algorithm: str
+	time_sec: float
+	expanded: int
+	generated: int
+	max_frontier: int
+	max_explored: int
+	max_structures: int
+	found: bool
+	completeness: Optional[bool]
+	optimal: Optional[bool]
+	path_cost: int
+	path_len: int
+
+
+def _eval_completeness_and_optimality(maze: "Maze", path: List[Pos]) -> Tuple[Optional[bool], Optional[bool]]:
+	"""Usa BFS como oráculo para verificar se solução existe e se custo é mínimo (custos = 1)."""
+	oracle = bfs(maze)
+	solution_exists = len(oracle) > 0
+	found = len(path) > 0
+	completeness = (not solution_exists and not found) or (solution_exists and found)
+	if not solution_exists or not found:
+		return completeness, None
+	# custo uniforme: custo = len(path) - 1
+	return completeness, (len(path) - 1) == (len(oracle) - 1)
 
 
 __all__ = ["bfs", "dfs", "astar", "greedy_best_first"]

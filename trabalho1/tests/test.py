@@ -13,7 +13,12 @@ import argparse
 from typing import Callable, List, Tuple
 
 from trabalho1.src.maze import Maze
-from trabalho1.src.search import bfs, dfs, astar, greedy_best_first
+from trabalho1.src.search import (
+    bfs,
+    dfs,
+    astar,
+    greedy_best_first,
+)
 from trabalho1.src.heuristics import manhattan as h_manhattan, euclidean as h_euclidean
 
 Pos = Tuple[int, int]
@@ -42,6 +47,7 @@ def main() -> int:
                         help="Heurística (manhattan | euclidean | zero). Usada em A* e Gulosa.")
     parser.add_argument("--no-render", action="store_true", help="Não imprimir o labirinto renderizado com o caminho.")
     parser.add_argument("--print-coords", action="store_true", help="Imprimir a lista de coordenadas do caminho.")
+    parser.add_argument("--stats", action="store_true", help="Imprimir métricas de desempenho (tempo, memória, nós, etc.).")
     args = parser.parse_args()
 
     maze_path = Path(args.maze) if args.maze else _load_default_maze_path()
@@ -50,19 +56,20 @@ def main() -> int:
     algo = args.algo.lower()
     path: List[Pos]
 
+    metrics = None
     if algo == "bfs":
-        path = bfs(mz)
+        path, metrics = bfs(mz, with_metrics=True, compute_optimality=args.stats) if args.stats else (bfs(mz), None)
         heur_name = "-"
     elif algo == "dfs":
-        path = dfs(mz)
+        path, metrics = dfs(mz, with_metrics=True, compute_optimality=args.stats) if args.stats else (dfs(mz), None)
         heur_name = "-"
     elif algo == "astar":
         h = _get_heuristic(args.heuristic)
-        path = astar(mz, h=h)
+        path, metrics = astar(mz, h=h, with_metrics=True, compute_optimality=args.stats) if args.stats else (astar(mz, h=h), None)
         heur_name = args.heuristic
     else:  # greedy
         h = _get_heuristic(args.heuristic)
-        path = greedy_best_first(mz, h=h)
+        path, metrics = greedy_best_first(mz, h=h, with_metrics=True, compute_optimality=args.stats) if args.stats else (greedy_best_first(mz, h=h), None)
         heur_name = args.heuristic
 
     print(f"Arquivo: {maze_path}")
@@ -70,6 +77,21 @@ def main() -> int:
     if path:
         custo = len(path) - 1  # custo uniforme (step_cost=1 por passo)
         print(f"Caminho encontrado com {len(path)} estados, custo = {custo}")
+        if metrics is not None:
+            print("-" * 60)
+            print("Métricas:")
+            print(f"  Tempo:            {metrics.time_sec*1000:.3f} ms")
+            print(f"  Nós expandidos:   {metrics.expanded}")
+            print(f"  Nós gerados:      {metrics.generated}")
+            print(f"  Memória (pico):   {metrics.max_structures}  "
+                  f"(fronteira={metrics.max_frontier}, explorados={metrics.max_explored})")
+            comp = "sim" if metrics.completeness is True else ("não" if metrics.completeness is False else "-")
+            opt = "sim" if metrics.optimal is True else ("não" if metrics.optimal is False else "-")
+            print(f"  Completude:       {comp}")
+            print(f"  Optimalidade:     {opt}")
+            print(f"  Custo do caminho: {metrics.path_cost}")
+            print(f"  Tamanho caminho:  {metrics.path_len}")
+            print("-" * 60)
         # Imprime sequência de letras: U(S) -> V -> Q -> ... -> E(G)
         labels: List[str] = []
         for i, pos in enumerate(path):
