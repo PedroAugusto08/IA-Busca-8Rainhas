@@ -107,13 +107,66 @@ python trabalho1/tests/test.py --algo greedy --heuristic euclidean
 python trabalho1/tests/test.py --algo bfs
 python trabalho1/tests/test.py --algo dfs
 
-# Opções úteis
-python trabalho1/tests/test.py --print-coords     # imprime lista de coordenadas do caminho
-python trabalho1/tests/test.py --no-render        # não imprime a grade renderizada
-
 # Especificar outro arquivo de labirinto
 python trabalho1/tests/test.py --maze trabalho1/data/labirinto.txt
 ```
+
+### Rodar todos os algoritmos e gerar tabela de métricas
+
+Agora é possível (e padrão) executar todos os algoritmos em sequência e salvar uma tabela consolidada com as métricas:
+
+```bash
+# Executa BFS, DFS, A* e Gulosa usando a heurística escolhida para A* e Gulosa
+python trabalho1/tests/test.py --algo all --heuristic manhattan --stats
+
+```
+
+Detalhes do modo "all":
+- A tabela é salva em arquivo (não é impressa no terminal) no caminho informado por `--out` ou, por padrão, em `trabalho1/metrics/metrics.txt`.
+- A saída inclui linhas nas seguintes ordens:
+	- BFS
+	- DFS
+	- A* (Manhattan)
+	- A* (Euclidiana)
+	- Greedy (Manhattan)
+	- Greedy (Euclidiana)
+- Colunas: Algoritmo, Heurística, Tempo(ms), Expandidos, Gerados, Pico (máximo de estruturas), Fronteira, Explorados, Completo, Ótimo, Custo, Tam, Caminho (sequência de letras U(S) -> ... -> E(G)).
+- Não há renderização visual no modo `all` (apenas a coluna do caminho por letras).
+
+### Métricas disponíveis (SearchMetrics)
+
+Quando `--stats` é usado (ou ao chamar as funções com `with_metrics=True`), são coletados e reportados:
+- `time_sec`: tempo total de execução do algoritmo (segundos)
+- `expanded`: nós expandidos
+- `generated`: nós gerados
+- `max_frontier`: pico de elementos na fronteira (fila/pilha/heap)
+- `max_explored`: pico de elementos no conjunto explorado/visitado/fechado
+- `max_structures`: `max_frontier + max_explored`
+- `found`: se encontrou solução
+- `completeness`: se o algoritmo é completo para o problema (avaliado via oráculo BFS quando solicitado)
+- `optimal`: se o caminho retornado é ótimo (avaliado via oráculo BFS quando solicitado)
+- `path_cost`: custo do caminho (custos uniformes = número de passos)
+- `path_len`: tamanho do caminho (número de estados)
+
+Observação: Completeness/Optimality só são avaliadas quando explicitamente solicitado (`--stats` no CLI, `compute_optimality=True` no código). Para A* e Gulosa no modo `all`, as métricas são registradas para Manhattan e Euclidiana.
+
+### API com métricas (uso programático)
+
+As funções também suportam coleta de métricas diretamente:
+
+```
+path = bfs(maze)
+path, metrics = bfs(maze, with_metrics=True, compute_optimality=True)
+
+path = astar(maze, h=manhattan)
+path, metrics = astar(maze, h=euclidean, with_metrics=True)
+```
+
+`metrics` é uma instância de `SearchMetrics` com os campos descritos acima.
+
+### Reprodutibilidade
+
+O runner fixa `random.seed(42)` para execuções determinísticas. Para evitar qualquer variação de hashing do Python em iterações de conjuntos, você pode opcionalmente definir `PYTHONHASHSEED=0` ao executar o script.
 
 Execução mínima do `Maze` (sanidade check):
 ```bash
