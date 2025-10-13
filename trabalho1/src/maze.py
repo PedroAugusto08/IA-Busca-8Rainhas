@@ -101,7 +101,12 @@ class Maze:
             if pos in cells:
                 raise ValueError(f"Posição duplicada {pos}.")
             cells[pos] = (n, s, l, o)
-            letters[pos] = letter if letter else '.'
+            # Usa apenas o primeiro caractere não espaço do comentário como letra
+            if letter:
+                first = next((ch for ch in letter if not ch.isspace()), '.')
+                letters[pos] = first
+            else:
+                letters[pos] = '.'
             max_r = max(max_r, r)
             max_c = max(max_c, c)
 
@@ -181,19 +186,34 @@ class Maze:
         return 1
 
     def render_path(self, path: List[Pos]) -> str:
-        # Cria uma cópia da grade de letras e sobrepõe marcações do caminho
-        # 'S' e 'G' sobrescrevem suas posições, 'o' para cada passo intermediário
-        out = [row[:] for row in self._letters]
-        sr,sc = self._start
-        gr,gc = self._goal
-        out[sr][sc] = 'S'
-        out[gr][gc] = 'G'
-        for (r,c) in path:
-            if not self.in_bounds((r,c)):
+        # Cria uma cópia da grade de letras e sobrepõe marcações do caminho.
+        # Destaque: Start e Goal aparecem com suas letras originais coloridas; passos intermediários são '.'.
+        tokens: List[List[str]] = [[self._letters[r][c] for c in range(self._width)] for r in range(self._height)]
+        sr, sc = self._start
+        gr, gc = self._goal
+
+        # Marca caminho intermediário
+        for (r, c) in path:
+            if not self.in_bounds((r, c)):
                 raise ValueError(f"Posição fora dos limites no path: {r},{c}")
-            if (r,c) not in (self._start, self._goal):
-                out[r][c] = 'o'
-        return '\n'.join(' '.join(ch for ch in row) for row in out)
+            if (r, c) not in (self._start, self._goal):
+                tokens[r][c] = '.'
+
+        # Aplica cores ANSI nas letras de Start (verde) e Goal (vermelho)
+        ANSI_GREEN_BOLD = "\x1b[1;32m"
+        ANSI_RED_BOLD = "\x1b[1;31m"
+        ANSI_RESET = "\x1b[0m"
+        tokens[sr][sc] = f"{ANSI_GREEN_BOLD}{self._letters[sr][sc]}{ANSI_RESET}"
+        tokens[gr][gc] = f"{ANSI_RED_BOLD}{self._letters[gr][gc]}{ANSI_RESET}"
+
+        return '\n'.join(' '.join(cell for cell in row) for row in tokens)
+
+    def label_at(self, pos: Pos) -> str:
+        # Retorna a letra associada à célula na posição dada
+        if not self.in_bounds(pos):
+            raise ValueError(f"Posição fora dos limites: {pos}")
+        r, c = pos
+        return self._letters[r][c]
 
     def __repr__(self) -> str:
         return f"MazeNSLO(height={self._height}, width={self._width}, start={self._start}, goal={self._goal})"

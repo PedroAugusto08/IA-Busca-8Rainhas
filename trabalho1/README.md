@@ -1,6 +1,8 @@
 # Trabalho 1 - Busca em Labirinto (Formato NSLO)
 
-Implementação de um labirinto baseado em máscaras de 4 bits (N, S, L, O) e buscas não informadas (BFS e DFS).
+Implementação de um labirinto baseado em máscaras de 4 bits (N, S, L, O) com buscas:
+- Não informadas: BFS e DFS
+- Informadas: A* e Gulosa (Greedy Best-First)
 
 ## Estrutura
 ```
@@ -57,14 +59,67 @@ Se o bit for 0, você pode tentar mover naquela direção (desde que o destino e
 
 ### Start e Goal
 - Fixos no código: Start = (4,0) e Goal = (0,4).
-- Ao renderizar um caminho, Start aparece como `S`, Goal como `G` e os passos intermediários como `o`.
+- Renderização do caminho:
+	- Start e Goal aparecem com as letras originais coloridas (verde/vermelho) no terminal.
+	- Passos intermediários são marcados com `.`.
 
-## Execução Rápida (Teste mínimo do maze)
+## Funções disponíveis (APIs)
+
+- `def bfs(maze: "Maze") -> List[Pos]`
+	- Busca em largura. Retorna caminho de Start até Goal (incluindo ambos). Ótimo em número de passos.
+- `def dfs(maze: "Maze") -> List[Pos]`
+	- Busca em profundidade. Não garante caminho mínimo.
+- `def astar(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = None) -> List[Pos]`
+	- A* com `f(n) = g(n) + h(n)`. Padrão `h`: Manhattan. Aceita qualquer heurística `Callable[[Pos, Pos], float]`.
+	- Ótimo em custo quando `h` é admissível (ex.: Manhattan em grid 4-direções com custo 1).
+- `def greedy_best_first(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = None) -> List[Pos]`
+	- Gulosa: fronteira ordenada apenas por `h(n)`. Rápida, mas não ótima.
+- `def manhattan(a: Pos, b: Pos) -> int` e `def euclidean(a: Pos, b: Pos) -> float`
+	- Heurísticas prontas para uso em A* e Gulosa.
+- `class Maze`
+	- `@classmethod def from_file(path: Union[Path, str]) -> "Maze"`
+	- `def start(self) -> Pos`
+	- `def goal(self) -> Pos`
+	- `def neighbors(self, pos: Pos) -> Iterator[Pos]`
+	- `def step_cost(self, from_pos: Pos, to_pos: Pos) -> int`
+	- `def label_at(self, pos: Pos) -> str`
+	- `def render_path(self, path: List[Pos]) -> str`
+
+Observações:
+- As buscas retornam `[]` quando não há caminho.
+- `Pos` é uma tupla `(row, col)`.
+
+## Como rodar
+
+O repositório inclui um runner CLI simples que funciona sem configuração extra. Execute os comandos a partir da raiz do repositório:
+
+```bash
+# A* (Manhattan — padrão)
+python trabalho1/tests/test.py --algo astar
+
+# A* com Euclidiana
+python trabalho1/tests/test.py --algo astar --heuristic euclidean
+
+# Gulosa (Greedy) com Euclidiana
+python trabalho1/tests/test.py --algo greedy --heuristic euclidean
+
+# BFS e DFS
+python trabalho1/tests/test.py --algo bfs
+python trabalho1/tests/test.py --algo dfs
+
+# Opções úteis
+python trabalho1/tests/test.py --print-coords     # imprime lista de coordenadas do caminho
+python trabalho1/tests/test.py --no-render        # não imprime a grade renderizada
+
+# Especificar outro arquivo de labirinto
+python trabalho1/tests/test.py --maze trabalho1/data/labirinto.txt
+```
+
+Execução mínima do `Maze` (sanidade check):
 ```bash
 python trabalho1/src/maze.py
 ```
-
-Isso carrega o arquivo `data/labirinto.txt`, imprime estrutura e vizinhos do Start.
+Isso carrega `data/labirinto.txt`, imprime a estrutura e os vizinhos do Start.
 
 ## Licença
 Uso educacional.
