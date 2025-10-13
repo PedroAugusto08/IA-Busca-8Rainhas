@@ -98,11 +98,8 @@ class MetricsRecorder:
 		assert self.enabled, "finalize() chamado sem métricas habilitadas"
 		t1 = perf_counter()
 		found = len(path) > 0
-		completeness: Optional[bool]
-		optimal: Optional[bool]
-		completeness = optimal = None
-		if self.compute_optimality:
-			completeness, optimal = _eval_completeness_and_optimality(maze, path)
+		# Sempre computar completude e optimalidade via oráculo BFS
+		completeness, optimal = _eval_completeness_and_optimality(maze, path)
 		return SearchMetrics(
 			algorithm=self.algorithm,
 			time_sec=t1 - self.t0,

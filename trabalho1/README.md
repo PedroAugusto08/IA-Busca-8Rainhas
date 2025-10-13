@@ -135,7 +135,7 @@ Detalhes do modo "all":
 
 ### Métricas disponíveis (SearchMetrics)
 
-Quando `--stats` é usado (ou ao chamar as funções com `with_metrics=True`), são coletados e reportados:
+Quando `--stats` é usado (ou ao chamar as funções com `with_metrics=True`), são coletados e reportados (sempre computando completude e otimalidade via oráculo BFS):
 - `time_sec`: tempo total de execução do algoritmo (segundos)
 - `expanded`: nós expandidos
 - `generated`: nós gerados
@@ -143,12 +143,12 @@ Quando `--stats` é usado (ou ao chamar as funções com `with_metrics=True`), s
 - `max_explored`: pico de elementos no conjunto explorado/visitado/fechado
 - `max_structures`: `max_frontier + max_explored`
 - `found`: se encontrou solução
-- `completeness`: se o algoritmo é completo para o problema (avaliado via oráculo BFS quando solicitado)
-- `optimal`: se o caminho retornado é ótimo (avaliado via oráculo BFS quando solicitado)
+- `completeness`: se o algoritmo é completo para o problema (avaliado via oráculo BFS)
+- `optimal`: se o caminho retornado é ótimo (avaliado via oráculo BFS)
 - `path_cost`: custo do caminho (custos uniformes = número de passos)
 - `path_len`: tamanho do caminho (número de estados)
 
-Observação: Completeness/Optimality só são avaliadas quando explicitamente solicitado (`--stats` no CLI, `compute_optimality=True` no código). Para A* e Gulosa no modo `all`, as métricas são registradas para Manhattan e Euclidiana.
+Observação: Para A* e Gulosa no modo `all`, as métricas são registradas para Manhattan e Euclidiana.
 
 ### API com métricas (uso programático)
 
