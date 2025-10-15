@@ -29,9 +29,7 @@ from time import perf_counter
 from dataclasses import dataclass
 
 if TYPE_CHECKING:
-	# Import apenas para análise estática, evitando acoplamento em tempo de execução
 	from .maze import Maze
-	# Heurísticas para type hint (opcional)
 	from .heuristics import manhattan as _manhattan_hint, euclidean as _euclidean_hint
 
 Pos = Tuple[int,int]
@@ -53,13 +51,8 @@ def _reconstruct_path(came_from: Dict[Pos, Pos], start: Pos, goal: Pos) -> List[
 
 
 class MetricsRecorder:
-	"""Utilitário para registrar métricas de busca de forma unificada.
-
-	Mantém a contagem de nós expandidos/gerados e os picos de estruturas
-	(fronteira e explorados) e monta o SearchMetrics no final, preservando
-	exatamente os valores esperados pelos algoritmos atuais.
-	"""
-
+	#Utilitário para registrar métricas de busca de forma unificada.
+	#Mantém a contagem de nós expandidos/gerados e os picos de estruturas (fronteira e explorados) e monta o SearchMetrics no final, preservando exatamente os valores esperados pelos algoritmos atuais.
 	def __init__(
 		self,
 		algorithm: str,
@@ -98,7 +91,7 @@ class MetricsRecorder:
 		assert self.enabled, "finalize() chamado sem métricas habilitadas"
 		t1 = perf_counter()
 		found = len(path) > 0
-		# Sempre computar completude e optimalidade via oráculo BFS
+		# Computa completude e optimalidade via oráculo BFS
 		completeness, optimal = _eval_completeness_and_optimality(maze, path)
 		return SearchMetrics(
 			algorithm=self.algorithm,
@@ -133,6 +126,7 @@ def bfs(maze: "Maze", with_metrics: bool = False, compute_optimality: bool = Fal
 	visited = {start}
 	came_from: Dict[Pos, Pos] = {}
 
+	# Loop principal da BFS: processa a fila, checa objetivo, enfileira vizinhos não visitados e atualiza métricas
 	while queue:
 		current = queue.popleft()
 		rec.inc_expanded()
@@ -148,6 +142,7 @@ def bfs(maze: "Maze", with_metrics: bool = False, compute_optimality: bool = Fal
 			rec.track_frontier(len(queue))
 			rec.track_explored(len(visited))
 
+	# Falha ou sucesso: reconstruir
 	path = _reconstruct_path(came_from, start, goal)
 	if not with_metrics:
 		return path
@@ -157,7 +152,7 @@ def bfs(maze: "Maze", with_metrics: bool = False, compute_optimality: bool = Fal
 def dfs(maze: "Maze", with_metrics: bool = False, compute_optimality: bool = False) -> Union[List[Pos], Tuple[List[Pos], "SearchMetrics"]]:
 	# DFS (Depth-First Search) iterativa com pilha.
 	# Não garante caminho mínimo; segue profundidade respeitando ordem N,S,L,O.
-	# Inserimos vizinhos em ordem reversa na pilha para explorar primeiro o Norte.
+	# Vizinhos em ordem reversa na pilha para explorar primeiro o Norte.
 	start = maze.start()
 	goal = maze.goal()
 	rec = MetricsRecorder("DFS", with_metrics, compute_optimality, initial_frontier=1, initial_explored=1)
@@ -176,7 +171,7 @@ def dfs(maze: "Maze", with_metrics: bool = False, compute_optimality: bool = Fal
 		rec.inc_expanded()
 		if current == goal:
 			break
-		# Precisamos listar antes para poder reverter a ordem de push
+		# Precisa-se listar antes para poder reverter a ordem de push
 		neighbors_list = list(maze.neighbors(current))
 		# Reverte para que o primeiro da ordem original seja explorado primeiro ao usar pilha
 		for nb in reversed(neighbors_list):
@@ -189,6 +184,7 @@ def dfs(maze: "Maze", with_metrics: bool = False, compute_optimality: bool = Fal
 			rec.track_frontier(len(stack))
 			rec.track_explored(len(visited))
 
+	# Falha ou sucesso: reconstruir
 	path = _reconstruct_path(came_from, start, goal)
 	if not with_metrics:
 		return path
@@ -245,6 +241,7 @@ def astar(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = None, with_me
 		closed.add(current)
 		rec.track_explored(len(closed))
 
+		# Explora vizinhos com base apenas na heurística: se h melhora, atualiza came_from e insere na fronteira (heap)
 		for nb in maze.neighbors(current):
 			if nb in closed:
 				continue
@@ -310,6 +307,7 @@ def greedy_best_first(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = N
 			break
 		visited.add(current)
 
+		# Explora vizinhos com base apenas na heurística: se h melhora, atualiza came_from e insere na fronteira (heap)
 		for nb in maze.neighbors(current):
 			if nb in visited:
 				continue
@@ -320,10 +318,12 @@ def greedy_best_first(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = N
 				heapq.heappush(open_heap, (new_h, next(push_counter), nb))
 				rec.inc_generated()
 				rec.track_frontier(len(open_heap))
-	path = _reconstruct_path(came_from, start, goal)
-	if not with_metrics:
-		return path
-	return path, rec.finalize(maze, path)
+    
+		# Falha ou sucesso: reconstruir
+		path = _reconstruct_path(came_from, start, goal)
+		if not with_metrics:
+			return path
+		return path, rec.finalize(maze, path)
 
 
 __all__ = ["bfs", "dfs", "astar", "greedy_best_first"]
@@ -348,7 +348,7 @@ class SearchMetrics:
 
 
 def _eval_completeness_and_optimality(maze: "Maze", path: List[Pos]) -> Tuple[Optional[bool], Optional[bool]]:
-	"""Usa BFS como oráculo para verificar se solução existe e se custo é mínimo (custos = 1)."""
+	# Usa BFS como oráculo para verificar se solução existe e se custo é mínimo (custos = 1).
 	oracle = bfs(maze)
 	solution_exists = len(oracle) > 0
 	found = len(path) > 0

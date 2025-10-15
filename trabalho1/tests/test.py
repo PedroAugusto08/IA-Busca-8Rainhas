@@ -4,7 +4,7 @@
 import sys
 from pathlib import Path
 
-# Garante que a raiz do repositório esteja no sys.path (2 níveis acima de trabalho1/tests/)
+# Garante que a raiz do repositório esteja no sys.path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -12,6 +12,7 @@ if str(REPO_ROOT) not in sys.path:
 import argparse
 import random
 from typing import Callable, List, Tuple
+
 # Fixar semente para reprodutibilidade em execuções de teste
 random.seed(42)
 
@@ -42,6 +43,7 @@ def _get_heuristic(name: str) -> Callable[[Pos, Pos], float]:
     raise ValueError(f"Heurística inválida: {name}. Use: manhattan | euclidean | zero")
 
 def main() -> int:
+    # Parser de argumentos CLI
     parser = argparse.ArgumentParser(description="Runner CLI para buscas no labirinto NSLO (BFS/DFS/A*/Gulosa).")
     parser.add_argument("--maze", type=str, default=None, help="Caminho do labirinto (padrão: trabalho1/data/labirinto.txt)")
     parser.add_argument("--algo", type=str, default="all", choices=["all", "bfs", "dfs", "astar", "greedy"],
@@ -54,15 +56,18 @@ def main() -> int:
     parser.add_argument("--out", type=str, default=None, help="Arquivo .txt para salvar a tabela quando --algo=all (padrão: tests/metrics.txt)")
     args = parser.parse_args()
 
+    # Carrega o labirinto do arquivo especificado ou padrão
     maze_path = Path(args.maze) if args.maze else _load_default_maze_path()
     mz = Maze.from_file(maze_path)
 
     algo = args.algo.lower()
     path: List[Pos]
 
+    # Função auxiliar para formatar booleanos como strings
     def _bool_str(v: bool | None) -> str:
         return "sim" if v is True else ("não" if v is False else "-")
 
+    # Função para formatar a tabela de métricas dos algoritmos
     def _format_table(rows: List[dict]) -> str:
         headers = [
             "Algoritmo", "Heurística", "Tempo(ms)", "Expandidos", "Gerados",
@@ -86,12 +91,12 @@ def main() -> int:
                 f"{m.path_len}",
                 r.get("path_str", "-"),
             ])
-        # calcular larguras
+        # Calcula larguras das colunas
         widths = [len(h) for h in headers]
         for row in data:
             for i, cell in enumerate(row):
                 widths[i] = max(widths[i], len(cell))
-        # montar
+        # Monta tabela formatada
         def fmt_row(cols: List[str]) -> str:
             return " | ".join(c.ljust(widths[i]) for i, c in enumerate(cols))
         sep = "-+-".join("-" * w for w in widths)
@@ -100,6 +105,7 @@ def main() -> int:
             lines.append(fmt_row(row))
         return "\n".join(lines)
 
+    # Função para mostrar sequência de letras do caminho encontrado
     def _labels_sequence(mz: Maze, path: List[Pos]) -> str:
         if not path:
             return "-"
@@ -116,33 +122,33 @@ def main() -> int:
         return " -> ".join(labels)
 
     if algo == "all":
-        # Executa todos os algoritmos e gera tabela
+        # Executa todos os algoritmos e gera tabela de métricas
         rows: List[dict] = []
 
-        # BFS
+        # Executa BFS
         p_bfs, m_bfs = bfs(mz, with_metrics=True, compute_optimality=args.stats)
         rows.append({"name": "BFS", "heur": "-", "metrics": m_bfs, "path_str": _labels_sequence(mz, p_bfs)})
 
-        # DFS
+        # Executa DFS
         p_dfs, m_dfs = dfs(mz, with_metrics=True, compute_optimality=args.stats)
         rows.append({"name": "DFS", "heur": "-", "metrics": m_dfs, "path_str": _labels_sequence(mz, p_dfs)})
 
-        # A* e Greedy com múltiplas heurísticas (ordem pedida)
+        # Executa A* e Greedy com múltiplas heurísticas
         heur_list = [
             ("Manhattan", _get_heuristic("manhattan")),
             ("Euclidiana", _get_heuristic("euclidean")),
         ]
-        # Primeiro todas as linhas de A*
+        # Executa A* para cada heurística
         for heur_name, h in heur_list:
             p_as, m_as = astar(mz, h=h, with_metrics=True, compute_optimality=args.stats)
             rows.append({"name": "A*", "heur": heur_name, "metrics": m_as, "path_str": _labels_sequence(mz, p_as)})
-        # Depois todas as linhas de Greedy
+        # Executa Greedy para cada heurística
         for heur_name, h in heur_list:
             p_gr, m_gr = greedy_best_first(mz, h=h, with_metrics=True, compute_optimality=args.stats)
             rows.append({"name": "Greedy", "heur": heur_name, "metrics": m_gr, "path_str": _labels_sequence(mz, p_gr)})
 
+        # Formata e salva tabela de métricas em arquivo
         table = _format_table(rows)
-        # caminho padrão do arquivo: trabalho1/metrics/metrics.txt
         metrics_dir = Path(__file__).resolve().parents[1] / "metrics"
         try:
             metrics_dir.mkdir(parents=True, exist_ok=True)
@@ -154,9 +160,10 @@ def main() -> int:
             print(f"Tabela de métricas salva em: {out_path}")
         except Exception as e:
             print("Falha ao salvar a tabela:", e)
-        # Não imprime a tabela no stdout quando --algo=all (apenas salva em arquivo)
+        # Não imprime a tabela no stdout quando --algo=all
         return 0
 
+    # Executa algoritmo selecionado individualmente
     metrics = None
     if algo == "bfs":
         path, metrics = bfs(mz, with_metrics=True, compute_optimality=args.stats) if args.stats else (bfs(mz), None)
@@ -173,6 +180,7 @@ def main() -> int:
         path, metrics = greedy_best_first(mz, h=h, with_metrics=True, compute_optimality=args.stats) if args.stats else (greedy_best_first(mz, h=h), None)
         heur_name = args.heuristic
 
+    # Exibe resultados no terminal
     print(f"Arquivo: {maze_path}")
     print(f"Algoritmo: {algo.upper()}  |  Heurística: {heur_name}")
     if path:
@@ -193,7 +201,7 @@ def main() -> int:
             print(f"  Custo do caminho: {metrics.path_cost}")
             print(f"  Tamanho caminho:  {metrics.path_len}")
             print("-" * 60)
-        # Imprime sequência de letras: U(S) -> V -> Q -> ... -> E(G)
+        # Imprime sequência de letras do caminho
         labels: List[str] = []
         for i, pos in enumerate(path):
             ch = mz.label_at(pos)
