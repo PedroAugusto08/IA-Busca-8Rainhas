@@ -1,10 +1,12 @@
-"""Heurísticas para busca informada no labirinto NSLO.
+"""Heurísticas para busca informada em grade 4-direções (NSLO).
 
-Assinaturas:
-- manhattan(a: Pos, b: Pos) -> int
-- euclidean(a: Pos, b: Pos) -> float
+Funções:
+- manhattan(a, b) -> int: |r1 - r2| + |c1 - c2|.
+- euclidean(a, b) -> float: sqrt((r1 - r2)^2 + (c1 - c2)^2).
 
-Onde Pos = tuple[int, int].
+Notas:
+- Em grid com custo de passo = 1, ambas são admissíveis e consistentes.
+- Pos = tuple[int, int].
 """
 from __future__ import annotations
 from math import sqrt

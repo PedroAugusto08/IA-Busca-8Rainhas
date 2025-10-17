@@ -1,24 +1,31 @@
-"""Algoritmos de busca não informada (BFS e DFS) para o Maze NSLO.
+"""Algoritmos de busca para o Maze NSLO (BFS, DFS, A* e Greedy).
 
-Contrato das funções:
-	- bfs(maze) -> list[Pos]
-	- dfs(maze) -> list[Pos]
+Inclui:
+- BFS (não informada): ótimo em número de passos.
+- DFS (não informada): não garante ótimo.
+- A* (informada): usa f(n) = g(n) + h(n).
+- Greedy Best-First (informada): ordena somente por h(n).
 
-Onde Pos = tuple[int,int].
+Heurísticas:
+- Parâmetro opcional h(a, b) -> float; padrão = Manhattan.
+- Módulo heuristics expõe manhattan() e euclidean().
 
-Regras/Assunções:
-	- Usa API do Maze: maze.start(), maze.goal(), maze.neighbors(pos) e maze.step_cost(from,to) (fixo 1).
-	- Retorna a sequência de posições do START até o GOAL (inclusivos). Se start == goal, lista com apenas essa posição.
-	- Se não houver caminho, retorna lista vazia [].
-	- BFS garante caminho mais curto em número de passos; DFS não garante otimalidade.
-	- A ordem de vizinhos (N,S,L,O) já é determinada pelo Maze, garantindo determinismo.
+Métricas:
+- Tempo de execução (perf_counter).
+- Nós expandidos e gerados.
+- Memória:
+  - Fronteira (pico): max_frontier
+  - Explorados (pico): max_explored
+  - Pico Memória (simultâneo): max_structures = max_t(len(fronteira_t) + len(explorados_t))
+- Completude e Otimalidade (avaliadas via BFS como oráculo).
+- Custo (len(path) - 1) e tamanho do caminho (len(path)).
 
-Campos de métricas: As funções também retornam métricas de desempenho.
+Determinismo:
+- Ordem de vizinhos N, S, L, O definida pelo Maze.
+- Empates na heap com desempate estável (contador incremental).
 
-Edge cases abordados:
-	- Labirinto vazio: Maze.from_file já impede.
-	- Start == Goal: retorno imediato.
-	- Nenhum caminho: visita esgota fronteira e retorna [].
+Casos especiais:
+- start == goal -> retorna [start] (e métricas coerentes, quando solicitadas).
 """
 from __future__ import annotations
 from collections import deque
@@ -27,10 +34,10 @@ import heapq
 from itertools import count
 from time import perf_counter
 from dataclasses import dataclass
+from .heuristics import manhattan as h_manhattan, euclidean as h_euclidean
 
 if TYPE_CHECKING:
 	from .maze import Maze
-	from .heuristics import manhattan as _manhattan_hint, euclidean as _euclidean_hint
 
 Pos = Tuple[int,int]
 
@@ -70,6 +77,7 @@ class MetricsRecorder:
 		self.generated = 0
 		self.max_frontier = initial_frontier if enabled else 0
 		self.max_explored = initial_explored if enabled else 0
+		self.max_total = (initial_frontier + initial_explored) if enabled else 0
 
 	def inc_expanded(self) -> None:
 		if self.enabled:
@@ -87,6 +95,13 @@ class MetricsRecorder:
 		if self.enabled and size > self.max_explored:
 			self.max_explored = size
 
+	def track_total(self, frontier_size: int, explored_size: int) -> None:
+		# Pico simultâneo de estruturas (fronteira + explorados)
+		if self.enabled:
+			total = frontier_size + explored_size
+			if total > self.max_total:
+				self.max_total = total
+
 	def finalize(self, maze: "Maze", path: List[Pos]) -> "SearchMetrics":
 		assert self.enabled, "finalize() chamado sem métricas habilitadas"
 		t1 = perf_counter()
@@ -100,7 +115,7 @@ class MetricsRecorder:
 			generated=self.generated,
 			max_frontier=self.max_frontier,
 			max_explored=self.max_explored,
-			max_structures=self.max_frontier + self.max_explored,
+			max_structures=self.max_total,
 			found=found,
 			completeness=completeness,
 			optimal=optimal,
@@ -141,6 +156,7 @@ def bfs(maze: "Maze", with_metrics: bool = False, compute_optimality: bool = Fal
 			rec.inc_generated()
 			rec.track_frontier(len(queue))
 			rec.track_explored(len(visited))
+			rec.track_total(len(queue), len(visited))
 
 	# Falha ou sucesso: reconstruir
 	path = _reconstruct_path(came_from, start, goal)
@@ -183,6 +199,7 @@ def dfs(maze: "Maze", with_metrics: bool = False, compute_optimality: bool = Fal
 			rec.inc_generated()
 			rec.track_frontier(len(stack))
 			rec.track_explored(len(visited))
+			rec.track_total(len(stack), len(visited))
 
 	# Falha ou sucesso: reconstruir
 	path = _reconstruct_path(came_from, start, goal)
@@ -207,14 +224,8 @@ def astar(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = None, with_me
 			return path
 		return path, rec.finalize(maze, path)
 
-	# Heurística (Manhattan) padrão
-	try:
-		from .heuristics import manhattan as default_h
-	except Exception:
-		# Fallback local se o import falhar por algum motivo
-		def default_h(a: Pos, b: Pos) -> float:
-			return float(abs(a[0] - b[0]) + abs(a[1] - b[1]))
-	heuristic = h or default_h
+	# Heurística padrão: Manhattan
+	heuristic = h or h_manhattan
 
 	# Estruturas
 	open_heap: List[Tuple[int, int, Pos]] = []  # (f, tie, node)
@@ -240,6 +251,7 @@ def astar(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = None, with_me
 			break
 		closed.add(current)
 		rec.track_explored(len(closed))
+		rec.track_total(len(open_heap), len(closed))
 
 		# Explora vizinhos com base apenas na heurística: se h melhora, atualiza came_from e insere na fronteira (heap)
 		for nb in maze.neighbors(current):
@@ -278,13 +290,8 @@ def greedy_best_first(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = N
 			return path
 		return path, rec.finalize(maze, path)
 
-	# Heurística padrão (Manhattan)
-	try:
-		from .heuristics import manhattan as default_h
-	except Exception:
-		def default_h(a: Pos, b: Pos) -> float:
-			return float(abs(a[0] - b[0]) + abs(a[1] - b[1]))
-	heuristic = h or default_h
+	# Heurística padrão: Manhattan
+	heuristic = h or h_manhattan
 
 	open_heap: List[Tuple[float, int, Pos]] = []  # (h, tie, node)
 	came_from: Dict[Pos, Pos] = {}
@@ -307,6 +314,7 @@ def greedy_best_first(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = N
 			break
 		visited.add(current)
 		rec.track_explored(len(visited))
+		rec.track_total(len(open_heap), len(visited))
 
 		# Explora vizinhos com base apenas na heurística: se h melhora, atualiza came_from e insere na fronteira (heap)
 		for nb in maze.neighbors(current):

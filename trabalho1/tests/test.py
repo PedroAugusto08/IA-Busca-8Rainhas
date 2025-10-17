@@ -150,6 +150,119 @@ def main() -> int:
         print(f"Tabela de métricas salva em: {out_path}")
     except Exception as e:
         print("Falha ao salvar a tabela:", e)
+
+    # Gera gráficos de barras das métricas usando os mesmos dados da tabela
+    def _generate_bar_charts(rows: List[dict], out_dir: Path) -> None:
+        try:
+            import matplotlib.pyplot as plt
+            from matplotlib.ticker import FuncFormatter, MaxNLocator
+            # Estilo legível com grade
+            try:
+                plt.style.use("seaborn-v0_8-whitegrid")
+            except Exception:
+                try:
+                    plt.style.use("seaborn-whitegrid")
+                except Exception:
+                    plt.style.use("ggplot")
+        except Exception as e:
+            # Se matplotlib não estiver disponível, registra uma dica e segue sem falhar o runner
+            try:
+                (out_dir / "PLOTING_DISABLED.txt").write_text(
+                    "matplotlib não encontrado. Para habilitar gráficos, instale com:\n\n"
+                    "pip install matplotlib\n\n"
+                    "Os gráficos são gerados automaticamente na próxima execução.",
+                    encoding="utf-8",
+                )
+            except Exception:
+                pass
+            return
+
+        labels = [
+            r["name"] if r["heur"] == "-" else f"{r['name']} ({r['heur']})"
+            for r in rows
+        ]
+
+        # Paleta consistente por algoritmo/heurística
+        color_map = {
+            "BFS": "#1f77b4",
+            "DFS": "#ff7f0e",
+            "A* (Manhattan)": "#2ca02c",
+            "A* (Euclidiana)": "#98df8a",
+            "Greedy (Manhattan)": "#d62728",
+            "Greedy (Euclidiana)": "#ff9896",
+        }
+        hatch_map = {
+            "BFS": "",
+            "DFS": "",
+            "A* (Manhattan)": "",
+            "A* (Euclidiana)": "///",
+            "Greedy (Manhattan)": "",
+            "Greedy (Euclidiana)": "///",
+        }
+
+        # Extratores das mesmas métricas usadas na tabela
+        metric_specs = [
+            ("tempo_ms", "Tempo (ms)", lambda m: m.time_sec * 1000.0, False),
+            ("expandidos", "Nós expandidos", lambda m: m.expanded, True),
+            ("gerados", "Nós gerados", lambda m: m.generated, True),
+            ("explorados", "Explorados (pico)", lambda m: m.max_explored, True),
+            ("fronteira", "Fronteira (pico)", lambda m: m.max_frontier, True),
+            ("pico_memoria", "Pico de memória (estruturas)", lambda m: m.max_structures, True),
+            ("custo", "Custo do caminho", lambda m: m.path_cost, True),
+        ]
+
+        for idx, (key, ylabel, fn, is_int) in enumerate(metric_specs, start=1):
+            values = [fn(r["metrics"]) for r in rows]
+            fig_h = 5 if len(labels) <= 6 else 6
+            fig, ax = plt.subplots(figsize=(10, fig_h))
+
+            # Cores e hachuras por algoritmo/heurística
+            full_labels = labels
+            colors = [color_map.get(lbl, "#4C78A8") for lbl in full_labels]
+            hatches = [hatch_map.get(lbl, "") for lbl in full_labels]
+
+            bars = ax.bar(full_labels, values, color=colors, edgecolor="#222", linewidth=0.6)
+            for bar, hatch in zip(bars, hatches):
+                bar.set_hatch(hatch)
+
+            ax.set_title(f"Comparação de métricas - {ylabel}")
+            ax.set_ylabel(ylabel)
+            ax.set_xlabel("Algoritmos")
+            ax.set_xticklabels(full_labels, rotation=15, ha="right")
+
+            # Grade e formatação do eixo Y
+            ax.grid(True, axis="y", linestyle="--", linewidth=0.6, alpha=0.6)
+            if key == "tempo_ms":
+                ax.yaxis.set_major_formatter(FuncFormatter(lambda x, pos: f"{x:.3f}"))
+            elif is_int:
+                ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+
+            # Espaço no topo para os rótulos
+            vmax = max(values) if values else 0
+            ax.set_ylim(0, vmax * 1.12 if vmax > 0 else 1)
+
+            # Rótulos nas barras (3 casas no tempo; inteiros nos demais)
+            for rect, val in zip(bars, values):
+                label = f"{val:.3f}" if key == "tempo_ms" else f"{int(val)}"
+                ax.annotate(
+                    label,
+                    xy=(rect.get_x() + rect.get_width() / 2, rect.get_height()),
+                    xytext=(0, 3),
+                    textcoords="offset points",
+                    ha="center",
+                    va="bottom",
+                    fontsize=8,
+                    color="#111",
+                )
+
+            fig.tight_layout()
+            png = out_dir / f"{idx:02d}_{key}.png"
+            try:
+                fig.savefig(png, dpi=200)
+            finally:
+                plt.close(fig)
+
+    _generate_bar_charts(rows, metrics_dir)
     return 0
 
 if __name__ == "__main__":

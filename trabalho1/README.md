@@ -4,148 +4,60 @@ Implementação de um labirinto baseado em máscaras de 4 bits (N, S, L, O) com 
 - Não informadas: BFS e DFS
 - Informadas: A* e Gulosa (Greedy Best-First)
 
-## Estrutura
+## Estrutura do projeto
 ```
-src/            # Código fonte (maze, search, heuristics)
-data/           # Arquivos de labirinto no formato NSLO
-tests/          # (a ajustar para o formato atual)
-```
+trabalho1/
+	src/                    # Código-fonte
+		maze.py              # Parser NSLO e API do Maze (start, goal, neighbors, step_cost, label_at)
+		search.py            # Algoritmos (BFS, DFS, A*, Greedy) + coleta de métricas (SearchMetrics)
+		heuristics.py        # Heurísticas: manhattan, euclidean
 
-## Requisitos
-Python 3.10+
+	data/                   # Labirintos no formato NSLO
+		labirinto.txt       # Arquivo de labirinto padrão (usado pelo runner)
 
-## Formato do Labirinto (NSLO)
-Cada célula é descrita em uma linha:
+	tests/                  # Runner (executa tudo de uma vez)
+		test.py             # Roda BFS/DFS/A*/Greedy (Manhattan/Euclidiana), gera metrics.txt e gráficos
 
-```
-[row,col]:NSLO  # LetraOpcional
-```
-
-Onde:
-- `row,col` começam em 0.
-- `NSLO` são 4 dígitos (0 ou 1) indicando (Norte, Sul, Leste, Oeste).
-	- 1 = parede (movimento bloqueado naquela direção)
-	- 0 = livre (movimento permitido se a célula destino existir)
-- Após `#` pode haver uma letra (apenas para visualização). Se omitida, `.` é usado internamente.
-- Linhas em branco ou iniciadas por `#` são ignoradas.
-- Opcionalmente podem existir ao final do arquivo as linhas documentais:
-	- `Start:[r,c]`
-	- `Goal:[r,c]`
-	Elas são apenas verificadas: o código fixa Start=(4,0) e Goal=(0,4). Se divergirem, gera erro.
-
-O arquivo deve formar um retângulo completo: todas as posições de (0,0) até (max_row,max_col) precisam estar presentes.
-
-### Exemplo mínimo
-```
-[0,0]:1110  # A
-[0,1]:1100  # B
-[0,2]:1101  # C
-[1,0]:1010  # D
-[1,1]:0011  # E
-[1,2]:1011  # F
-[2,0]:0110  # G
-[2,1]:0010  # H
-[2,2]:0111  # I
+	metrics/                # Saídas geradas pelo runner
+		metrics.txt         # Tabela consolidada de métricas
+		01_tempo_ms.png     # Gráfico: Tempo (ms)
+		02_expandidos.png   # Gráfico: Expandidos
+		03_gerados.png      # Gráfico: Gerados
+		04_explorados.png   # Gráfico: Explorados (pico)
+		05_fronteira.png    # Gráfico: Fronteira (pico)
+		06_pico_memoria.png # Gráfico: Pico Memória (pico simultâneo)
+		07_custo.png        # Gráfico: Custo do caminho
 ```
 
-### Interpretação dos bits
-Para a célula `[r,c]:abcd`:
-- `a` (1º dígito) => Norte
-- `b` (2º) => Sul
-- `c` (3º) => Leste
-- `d` (4º) => Oeste
+## Dependências
+- Python 3.10+
+- Bibliotecas:
+	- matplotlib
 
-Se o bit for 0, você pode tentar mover naquela direção (desde que o destino exista). Não é exigida reciprocidade: mover de X para Y não implica que o movimento inverso seja permitido.
+Instalação:
+```bash
+pip install matplotlib
+```
 
-### Start e Goal
-- Fixos no código: Start = (4,0) e Goal = (0,4).
-
-## Funções disponíveis (APIs)
-
-- `def bfs(maze: "Maze") -> List[Pos]`
-	- Busca em largura. Retorna caminho de Start até Goal (incluindo ambos). Ótimo em número de passos.
-- `def dfs(maze: "Maze") -> List[Pos]`
-	- Busca em profundidade. Não garante caminho mínimo.
-- `def astar(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = None) -> List[Pos]`
-	- A* com `f(n) = g(n) + h(n)`. Padrão `h`: Manhattan. Aceita qualquer heurística `Callable[[Pos, Pos], float]`.
-	- Ótimo em custo quando `h` é admissível (ex.: Manhattan em grid 4-direções com custo 1).
-- `def greedy_best_first(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = None) -> List[Pos]`
-	- Gulosa: fronteira ordenada apenas por `h(n)`. Rápida, mas não ótima.
-- `def manhattan(a: Pos, b: Pos) -> int` e `def euclidean(a: Pos, b: Pos) -> float`
-	- Heurísticas prontas para uso em A* e Gulosa.
-- `class Maze`
-	- `@classmethod def from_file(path: Union[Path, str]) -> "Maze"`
-	- `def start(self) -> Pos`
-	- `def goal(self) -> Pos`
-	- `def neighbors(self, pos: Pos) -> Iterator[Pos]`
-	- `def step_cost(self, from_pos: Pos, to_pos: Pos) -> int`
-	- `def label_at(self, pos: Pos) -> str`
-
-
-Observações:
-- As buscas retornam `[]` quando não há caminho.
-- `Pos` é uma tupla `(row, col)`.
-
-## Como rodar
-
-O repositório inclui um runner simples que executa todos os algoritmos de uma vez e salva as métricas em arquivo. A partir da raiz do repositório:
+## Como executar
+- Executa todos os algoritmos (BFS, DFS, A* com Manhattan/Euclidiana e Greedy com Manhattan/Euclidiana) e salva a tabela de métricas.
 
 ```bash
 python trabalho1/tests/test.py
 ```
 
-Detalhes da execução:
-- A tabela é salva em arquivo (não é impressa no terminal), por padrão em `trabalho1/metrics/metrics.txt`.
-- A saída inclui linhas nas seguintes ordens:
-	- BFS
-	- DFS
-	- A* (Manhattan)
-	- A* (Euclidiana)
-	- Greedy (Manhattan)
-	- Greedy (Euclidiana)
-	- Colunas: Algoritmo, Heurística, Tempo(ms), Expandidos, Gerados, Explorados, Fronteira, Pico Memória (máximo de estruturas), Completo, Ótimo, Custo, Caminho (sequência de letras U(S) -> ... -> E(G)).
-- Não há renderização visual (apenas a coluna do caminho por letras). O método `render_path` foi removido.
+Saídas:
+- Tabela: `trabalho1/metrics/metrics.txt`
+- O script imprime apenas o caminho do arquivo salvo (a tabela não é exibida no terminal).
+- Para alterar o labirinto de entrada:
+	```bash
+	python trabalho1/tests/test.py --maze trabalho1/data/labirinto.txt
+	```
 
-### Métricas disponíveis (SearchMetrics)
+Reprodutibilidade:
+- O runner fixa a semente: `random.seed(42)`.
 
-Ao chamar as funções com `with_metrics=True`, são coletados e reportados (sempre computando completude e otimalidade via oráculo BFS):
-- `time_sec`: tempo total de execução do algoritmo (segundos)
-- `expanded`: nós expandidos
-- `generated`: nós gerados
-- `max_frontier`: pico de elementos na fronteira (fila/pilha/heap)
-- `max_explored`: pico de elementos no conjunto explorado/visitado/fechado
-- `max_structures`: `max_frontier + max_explored`
-- `found`: se encontrou solução
-- `completeness`: se o algoritmo é completo para o problema (avaliado via oráculo BFS)
-- `optimal`: se o caminho retornado é ótimo (avaliado via oráculo BFS)
-- `path_cost`: custo do caminho (custos uniformes = número de passos)
-- `path_len`: tamanho do caminho (número de estados)
-
-Observação: Na execução padrão, A* e Gulosa são medidos com Manhattan e Euclidiana automaticamente.
-
-### API com métricas (uso programático)
-
-As funções também suportam coleta de métricas diretamente:
-
-```
-path = bfs(maze)
-path, metrics = bfs(maze, with_metrics=True, compute_optimality=True)
-
-path = astar(maze, h=manhattan)
-path, metrics = astar(maze, h=euclidean, with_metrics=True)
-```
-
-`metrics` é uma instância de `SearchMetrics` com os campos descritos acima.
-
-### Reprodutibilidade
-
-O runner fixa `random.seed(42)` para execuções determinísticas. Para evitar qualquer variação de hashing do Python em iterações de conjuntos, você pode opcionalmente definir `PYTHONHASHSEED=0` ao executar o script.
-
-Execução mínima do `Maze` (sanidade check):
-```bash
-python trabalho1/src/maze.py
-```
-Isso carrega `data/labirinto.txt`, imprime a estrutura e os vizinhos do Start.
-
-## Licença
-Uso educacional.
+## Como reproduzir os gráficos
+- Se `matplotlib` estiver instalado, os gráficos são gerados automaticamente após a execução do runner.
+- Arquivos PNG são salvos em `trabalho1/metrics/` com nomes por métrica (tempo_ms, expandidos, gerados, explorados, fronteira, pico_memoria, custo).
+- Caso `matplotlib` não esteja instalado, os gráficos são pulados; um arquivo de aviso é salvo em `trabalho1/metrics/PLOTTING_DISABLED.txt` com instruções de instalação.

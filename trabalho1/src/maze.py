@@ -22,11 +22,6 @@ Movimento:
 Passabilidade:
 	- passable() retorna True se a célula possui ao menos um bit == 0 (tem alguma saída possível).
 
-Renderização (render_path):
-	- Sem caminho: imprime grade de letras (ou '.' se faltar letra, embora não esperado).
-	- Com caminho: 'S' e 'G' sobrescrevem letras nas posições de início e fim, e 'o' nas demais
-		posições do path.
-
 Erros: ValueError para qualquer inconsistência (formato, máscara inválida, posição duplicada,
 ausência de alguma célula do retângulo deduzido, declaração Start/Goal divergente).
 """
