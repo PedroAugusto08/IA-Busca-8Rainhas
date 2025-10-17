@@ -185,29 +185,6 @@ class Maze:
     def step_cost(self, from_pos: Pos, to_pos: Pos) -> int:
         return 1
 
-    def render_path(self, path: List[Pos]) -> str:
-        # Cria uma cópia da grade de letras e sobrepõe marcações do caminho.
-        # Destaque: Start e Goal aparecem com suas letras originais coloridas; passos intermediários são '.'.
-        tokens: List[List[str]] = [[self._letters[r][c] for c in range(self._width)] for r in range(self._height)]
-        sr, sc = self._start
-        gr, gc = self._goal
-
-        # Marca caminho intermediário
-        for (r, c) in path:
-            if not self.in_bounds((r, c)):
-                raise ValueError(f"Posição fora dos limites no path: {r},{c}")
-            if (r, c) not in (self._start, self._goal):
-                tokens[r][c] = '.'
-
-        # Aplica cores ANSI nas letras de Start (verde) e Goal (vermelho)
-        ANSI_GREEN_BOLD = "\x1b[1;32m"
-        ANSI_RED_BOLD = "\x1b[1;31m"
-        ANSI_RESET = "\x1b[0m"
-        tokens[sr][sc] = f"{ANSI_GREEN_BOLD}{self._letters[sr][sc]}{ANSI_RESET}"
-        tokens[gr][gc] = f"{ANSI_RED_BOLD}{self._letters[gr][gc]}{ANSI_RESET}"
-
-        return '\n'.join(' '.join(cell for cell in row) for row in tokens)
-
     def label_at(self, pos: Pos) -> str:
         # Retorna a letra associada à célula na posição dada
         if not self.in_bounds(pos):
@@ -239,6 +216,6 @@ if __name__ == '__main__': # Teste simples
         print(m)
         print('Start:', m.start(), 'Goal:', m.goal())
         print('Vizinhos Start:', list(m.neighbors(m.start())))
-        print('Render vazio:\n' + m.render_path([]))
+    # Sem renderização de labirinto aqui
     except ValueError as e:
         print('Erro ao carregar maze:', e)

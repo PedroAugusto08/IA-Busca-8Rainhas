@@ -29,7 +29,7 @@ Pos = Tuple[int, int]
 
 def _load_default_maze_path() -> Path:
     # Resolve trabalho1/data/labirinto.txt a partir deste arquivo
-    base = Path(__file__).resolve().parents[1]  # .../trabalho1
+    base = Path(__file__).resolve().parents[1]
     return base / "data" / "labirinto.txt"
 
 def _get_heuristic(name: str) -> Callable[[Pos, Pos], float]:
@@ -44,23 +44,15 @@ def _get_heuristic(name: str) -> Callable[[Pos, Pos], float]:
 
 def main() -> int:
     # Parser de argumentos CLI
-    parser = argparse.ArgumentParser(description="Runner CLI para buscas no labirinto NSLO (BFS/DFS/A*/Gulosa).")
+    parser = argparse.ArgumentParser(description="Runner CLI - executa BFS, DFS, A* (Manhattan/Euclidiana) e Greedy (Manhattan/Euclidiana) e salva métricas em tabela.")
     parser.add_argument("--maze", type=str, default=None, help="Caminho do labirinto (padrão: trabalho1/data/labirinto.txt)")
-    parser.add_argument("--algo", type=str, default="all", choices=["all", "bfs", "dfs", "astar", "greedy"],
-                        help="Algoritmo de busca (padrão: all)")
-    parser.add_argument("--heuristic", type=str, default="manhattan",
-                        help="Heurística (manhattan | euclidean | zero). Usada em A* e Gulosa.")
-    parser.add_argument("--no-render", action="store_true", help="Não imprimir o labirinto renderizado com o caminho.")
-    parser.add_argument("--print-coords", action="store_true", help="Imprimir a lista de coordenadas do caminho.")
-    parser.add_argument("--stats", action="store_true", help="Imprimir métricas de desempenho (tempo, memória, nós, etc.).")
-    parser.add_argument("--out", type=str, default=None, help="Arquivo .txt para salvar a tabela quando --algo=all (padrão: tests/metrics.txt)")
+    parser.add_argument("--out", type=str, default=None, help="Arquivo .txt para salvar a tabela (padrão: trabalho1/metrics/metrics.txt)")
     args = parser.parse_args()
 
     # Carrega o labirinto do arquivo especificado ou padrão
     maze_path = Path(args.maze) if args.maze else _load_default_maze_path()
     mz = Maze.from_file(maze_path)
 
-    algo = args.algo.lower()
     path: List[Pos]
 
     # Função auxiliar para formatar booleanos como strings
@@ -71,7 +63,7 @@ def main() -> int:
     def _format_table(rows: List[dict]) -> str:
         headers = [
             "Algoritmo", "Heurística", "Tempo(ms)", "Expandidos", "Gerados",
-            "Pico", "Fronteira", "Explorados", "Completo", "Ótimo", "Custo", "Tam", "Caminho"
+            "Explorados", "Fronteira", "Pico Memória", "Completo", "Ótimo", "Custo", "Caminho"
         ]
         data = []
         for r in rows:
@@ -82,13 +74,12 @@ def main() -> int:
                 f"{m.time_sec*1000:.3f}",
                 f"{m.expanded}",
                 f"{m.generated}",
-                f"{m.max_structures}",
-                f"{m.max_frontier}",
                 f"{m.max_explored}",
+                f"{m.max_frontier}",
+                f"{m.max_structures}",
                 _bool_str(m.completeness),
                 _bool_str(m.optimal),
                 f"{m.path_cost}",
-                f"{m.path_len}",
                 r.get("path_str", "-"),
             ])
         # Calcula larguras das colunas
@@ -121,105 +112,44 @@ def main() -> int:
                 labels.append(ch)
         return " -> ".join(labels)
 
-    if algo == "all":
-        # Executa todos os algoritmos e gera tabela de métricas
-        rows: List[dict] = []
+    # Executa todos os algoritmos e gera tabela de métricas
+    rows: List[dict] = []
 
-        # Executa BFS
-        p_bfs, m_bfs = bfs(mz, with_metrics=True, compute_optimality=args.stats)
-        rows.append({"name": "BFS", "heur": "-", "metrics": m_bfs, "path_str": _labels_sequence(mz, p_bfs)})
+    # Executa BFS
+    p_bfs, m_bfs = bfs(mz, with_metrics=True, compute_optimality=True)
+    rows.append({"name": "BFS", "heur": "-", "metrics": m_bfs, "path_str": _labels_sequence(mz, p_bfs)})
 
-        # Executa DFS
-        p_dfs, m_dfs = dfs(mz, with_metrics=True, compute_optimality=args.stats)
-        rows.append({"name": "DFS", "heur": "-", "metrics": m_dfs, "path_str": _labels_sequence(mz, p_dfs)})
+    # Executa DFS
+    p_dfs, m_dfs = dfs(mz, with_metrics=True, compute_optimality=True)
+    rows.append({"name": "DFS", "heur": "-", "metrics": m_dfs, "path_str": _labels_sequence(mz, p_dfs)})
 
-        # Executa A* e Greedy com múltiplas heurísticas
-        heur_list = [
-            ("Manhattan", _get_heuristic("manhattan")),
-            ("Euclidiana", _get_heuristic("euclidean")),
-        ]
-        # Executa A* para cada heurística
-        for heur_name, h in heur_list:
-            p_as, m_as = astar(mz, h=h, with_metrics=True, compute_optimality=args.stats)
-            rows.append({"name": "A*", "heur": heur_name, "metrics": m_as, "path_str": _labels_sequence(mz, p_as)})
-        # Executa Greedy para cada heurística
-        for heur_name, h in heur_list:
-            p_gr, m_gr = greedy_best_first(mz, h=h, with_metrics=True, compute_optimality=args.stats)
-            rows.append({"name": "Greedy", "heur": heur_name, "metrics": m_gr, "path_str": _labels_sequence(mz, p_gr)})
+    # Executa A* e Greedy com múltiplas heurísticas
+    heur_list = [
+        ("Manhattan", _get_heuristic("manhattan")),
+        ("Euclidiana", _get_heuristic("euclidean")),
+    ]
+    # Executa A* para cada heurística
+    for heur_name, h in heur_list:
+        p_as, m_as = astar(mz, h=h, with_metrics=True, compute_optimality=True)
+        rows.append({"name": "A*", "heur": heur_name, "metrics": m_as, "path_str": _labels_sequence(mz, p_as)})
+    # Executa Greedy para cada heurística
+    for heur_name, h in heur_list:
+        p_gr, m_gr = greedy_best_first(mz, h=h, with_metrics=True, compute_optimality=True)
+        rows.append({"name": "Greedy", "heur": heur_name, "metrics": m_gr, "path_str": _labels_sequence(mz, p_gr)})
 
-        # Formata e salva tabela de métricas em arquivo
-        table = _format_table(rows)
-        metrics_dir = Path(__file__).resolve().parents[1] / "metrics"
-        try:
-            metrics_dir.mkdir(parents=True, exist_ok=True)
-        except Exception:
-            pass
-        out_path = Path(args.out) if args.out else (metrics_dir / "metrics.txt")
-        try:
-            out_path.write_text(table + "\n", encoding="utf-8")
-            print(f"Tabela de métricas salva em: {out_path}")
-        except Exception as e:
-            print("Falha ao salvar a tabela:", e)
-        # Não imprime a tabela no stdout quando --algo=all
-        return 0
-
-    # Executa algoritmo selecionado individualmente
-    metrics = None
-    if algo == "bfs":
-        path, metrics = bfs(mz, with_metrics=True, compute_optimality=args.stats) if args.stats else (bfs(mz), None)
-        heur_name = "-"
-    elif algo == "dfs":
-        path, metrics = dfs(mz, with_metrics=True, compute_optimality=args.stats) if args.stats else (dfs(mz), None)
-        heur_name = "-"
-    elif algo == "astar":
-        h = _get_heuristic(args.heuristic)
-        path, metrics = astar(mz, h=h, with_metrics=True, compute_optimality=args.stats) if args.stats else (astar(mz, h=h), None)
-        heur_name = args.heuristic
-    else:  # greedy
-        h = _get_heuristic(args.heuristic)
-        path, metrics = greedy_best_first(mz, h=h, with_metrics=True, compute_optimality=args.stats) if args.stats else (greedy_best_first(mz, h=h), None)
-        heur_name = args.heuristic
-
-    # Exibe resultados no terminal
-    print(f"Arquivo: {maze_path}")
-    print(f"Algoritmo: {algo.upper()}  |  Heurística: {heur_name}")
-    if path:
-        custo = len(path) - 1  # custo uniforme (step_cost=1 por passo)
-        print(f"Caminho encontrado com {len(path)} estados, custo = {custo}")
-        if metrics is not None:
-            print("-" * 60)
-            print("Métricas:")
-            print(f"  Tempo:            {metrics.time_sec*1000:.3f} ms")
-            print(f"  Nós expandidos:   {metrics.expanded}")
-            print(f"  Nós gerados:      {metrics.generated}")
-            print(f"  Memória (pico):   {metrics.max_structures}  "
-                  f"(fronteira={metrics.max_frontier}, explorados={metrics.max_explored})")
-            comp = "sim" if metrics.completeness is True else ("não" if metrics.completeness is False else "-")
-            opt = "sim" if metrics.optimal is True else ("não" if metrics.optimal is False else "-")
-            print(f"  Completude:       {comp}")
-            print(f"  Optimalidade:     {opt}")
-            print(f"  Custo do caminho: {metrics.path_cost}")
-            print(f"  Tamanho caminho:  {metrics.path_len}")
-            print("-" * 60)
-        # Imprime sequência de letras do caminho
-        labels: List[str] = []
-        for i, pos in enumerate(path):
-            ch = mz.label_at(pos)
-            if pos == mz.start():
-                labels.append(f"{ch}(S)")
-            elif pos == mz.goal():
-                labels.append(f"{ch}(G)")
-            else:
-                labels.append(ch)
-        print("Sequência:", " -> ".join(labels))
-        if args.print_coords:
-            print("Coordenadas:", path)
-        if not args.no_render:
-            print("\nRenderização:\n")
-            print(mz.render_path(path))
-    else:
-        print("Sem caminho encontrado.")
-
+    # Formata e salva tabela de métricas em arquivo
+    table = _format_table(rows)
+    metrics_dir = Path(__file__).resolve().parents[1] / "metrics"
+    try:
+        metrics_dir.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+    out_path = Path(args.out) if args.out else (metrics_dir / "metrics.txt")
+    try:
+        out_path.write_text(table + "\n", encoding="utf-8")
+        print(f"Tabela de métricas salva em: {out_path}")
+    except Exception as e:
+        print("Falha ao salvar a tabela:", e)
     return 0
 
 if __name__ == "__main__":

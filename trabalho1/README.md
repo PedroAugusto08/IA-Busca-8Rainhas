@@ -59,9 +59,6 @@ Se o bit for 0, você pode tentar mover naquela direção (desde que o destino e
 
 ### Start e Goal
 - Fixos no código: Start = (4,0) e Goal = (0,4).
-- Renderização do caminho:
-	- Start e Goal aparecem com as letras originais coloridas (verde/vermelho) no terminal.
-	- Passos intermediários são marcados com `.`.
 
 ## Funções disponíveis (APIs)
 
@@ -83,7 +80,7 @@ Se o bit for 0, você pode tentar mover naquela direção (desde que o destino e
 	- `def neighbors(self, pos: Pos) -> Iterator[Pos]`
 	- `def step_cost(self, from_pos: Pos, to_pos: Pos) -> int`
 	- `def label_at(self, pos: Pos) -> str`
-	- `def render_path(self, path: List[Pos]) -> str`
+
 
 Observações:
 - As buscas retornam `[]` quando não há caminho.
@@ -91,38 +88,14 @@ Observações:
 
 ## Como rodar
 
-O repositório inclui um runner CLI simples que funciona sem configuração extra. Execute os comandos a partir da raiz do repositório:
+O repositório inclui um runner simples que executa todos os algoritmos de uma vez e salva as métricas em arquivo. A partir da raiz do repositório:
 
 ```bash
-# A* (Manhattan — padrão)
-python trabalho1/tests/test.py --algo astar
-
-# A* com Euclidiana
-python trabalho1/tests/test.py --algo astar --heuristic euclidean
-
-# Gulosa (Greedy) com Euclidiana
-python trabalho1/tests/test.py --algo greedy --heuristic euclidean
-
-# BFS e DFS
-python trabalho1/tests/test.py --algo bfs
-python trabalho1/tests/test.py --algo dfs
-
-# Especificar outro arquivo de labirinto
-python trabalho1/tests/test.py --maze trabalho1/data/labirinto.txt
+python trabalho1/tests/test.py
 ```
 
-### Rodar todos os algoritmos e gerar tabela de métricas
-
-Agora é possível (e padrão) executar todos os algoritmos em sequência e salvar uma tabela consolidada com as métricas:
-
-```bash
-# Executa BFS, DFS, A* e Gulosa usando a heurística escolhida para A* e Gulosa
-python trabalho1/tests/test.py --algo all --heuristic manhattan --stats
-
-```
-
-Detalhes do modo "all":
-- A tabela é salva em arquivo (não é impressa no terminal) no caminho informado por `--out` ou, por padrão, em `trabalho1/metrics/metrics.txt`.
+Detalhes da execução:
+- A tabela é salva em arquivo (não é impressa no terminal), por padrão em `trabalho1/metrics/metrics.txt`.
 - A saída inclui linhas nas seguintes ordens:
 	- BFS
 	- DFS
@@ -130,12 +103,12 @@ Detalhes do modo "all":
 	- A* (Euclidiana)
 	- Greedy (Manhattan)
 	- Greedy (Euclidiana)
-- Colunas: Algoritmo, Heurística, Tempo(ms), Expandidos, Gerados, Pico (máximo de estruturas), Fronteira, Explorados, Completo, Ótimo, Custo, Tam, Caminho (sequência de letras U(S) -> ... -> E(G)).
-- Não há renderização visual no modo `all` (apenas a coluna do caminho por letras).
+	- Colunas: Algoritmo, Heurística, Tempo(ms), Expandidos, Gerados, Explorados, Fronteira, Pico Memória (máximo de estruturas), Completo, Ótimo, Custo, Caminho (sequência de letras U(S) -> ... -> E(G)).
+- Não há renderização visual (apenas a coluna do caminho por letras). O método `render_path` foi removido.
 
 ### Métricas disponíveis (SearchMetrics)
 
-Quando `--stats` é usado (ou ao chamar as funções com `with_metrics=True`), são coletados e reportados (sempre computando completude e otimalidade via oráculo BFS):
+Ao chamar as funções com `with_metrics=True`, são coletados e reportados (sempre computando completude e otimalidade via oráculo BFS):
 - `time_sec`: tempo total de execução do algoritmo (segundos)
 - `expanded`: nós expandidos
 - `generated`: nós gerados
@@ -148,7 +121,7 @@ Quando `--stats` é usado (ou ao chamar as funções com `with_metrics=True`), s
 - `path_cost`: custo do caminho (custos uniformes = número de passos)
 - `path_len`: tamanho do caminho (número de estados)
 
-Observação: Para A* e Gulosa no modo `all`, as métricas são registradas para Manhattan e Euclidiana.
+Observação: Na execução padrão, A* e Gulosa são medidos com Manhattan e Euclidiana automaticamente.
 
 ### API com métricas (uso programático)
 

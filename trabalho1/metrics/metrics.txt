@@ -1,8 +1,8 @@
-Algoritmo | Heurística | Tempo(ms) | Expandidos | Gerados | Pico | Fronteira | Explorados | Completo | Ótimo | Custo | Tam | Caminho                                                  
-----------+------------+-----------+------------+---------+------+-----------+------------+----------+-------+-------+-----+----------------------------------------------------------
-BFS       | -          | 0.053     | 22         | 22      | 26   | 3         | 23         | sim      | sim   | 10    | 11  | U(S) -> V -> Q -> L -> M -> N -> I -> H -> C -> D -> E(G)
-DFS       | -          | 0.039     | 18         | 20      | 25   | 4         | 21         | sim      | sim   | 10    | 11  | U(S) -> V -> Q -> L -> M -> N -> I -> H -> C -> D -> E(G)
-A*        | Manhattan  | 0.075     | 20         | 20      | 22   | 3         | 19         | sim      | sim   | 10    | 11  | U(S) -> V -> Q -> L -> M -> N -> I -> H -> C -> D -> E(G)
-A*        | Euclidiana | 0.069     | 20         | 20      | 23   | 4         | 19         | sim      | sim   | 10    | 11  | U(S) -> V -> Q -> L -> M -> N -> I -> H -> C -> D -> E(G)
-Greedy    | Manhattan  | 0.042     | 14         | 16      | 4    | 4         | 0          | sim      | sim   | 10    | 11  | U(S) -> V -> Q -> L -> M -> N -> I -> H -> C -> D -> E(G)
-Greedy    | Euclidiana | 0.041     | 14         | 16      | 4    | 4         | 0          | sim      | sim   | 10    | 11  | U(S) -> V -> Q -> L -> M -> N -> I -> H -> C -> D -> E(G)
+Algoritmo | Heurística | Tempo(ms) | Expandidos | Gerados | Explorados | Fronteira | Pico Memória | Completo | Ótimo | Custo | Caminho                                                  
+----------+------------+-----------+------------+---------+------------+-----------+--------------+----------+-------+-------+----------------------------------------------------------
+BFS       | -          | 0.065     | 22         | 22      | 23         | 3         | 26           | sim      | sim   | 10    | U(S) -> V -> Q -> L -> M -> N -> I -> H -> C -> D -> E(G)
+DFS       | -          | 0.054     | 18         | 20      | 21         | 4         | 25           | sim      | sim   | 10    | U(S) -> V -> Q -> L -> M -> N -> I -> H -> C -> D -> E(G)
+A*        | Manhattan  | 0.151     | 20         | 20      | 19         | 3         | 22           | sim      | sim   | 10    | U(S) -> V -> Q -> L -> M -> N -> I -> H -> C -> D -> E(G)
+A*        | Euclidiana | 0.085     | 20         | 20      | 19         | 4         | 23           | sim      | sim   | 10    | U(S) -> V -> Q -> L -> M -> N -> I -> H -> C -> D -> E(G)
+Greedy    | Manhattan  | 0.057     | 14         | 16      | 13         | 4         | 17           | sim      | sim   | 10    | U(S) -> V -> Q -> L -> M -> N -> I -> H -> C -> D -> E(G)
+Greedy    | Euclidiana | 0.057     | 14         | 16      | 13         | 4         | 17           | sim      | sim   | 10    | U(S) -> V -> Q -> L -> M -> N -> I -> H -> C -> D -> E(G)

@@ -13,7 +13,7 @@ Regras/Assunções:
 	- BFS garante caminho mais curto em número de passos; DFS não garante otimalidade.
 	- A ordem de vizinhos (N,S,L,O) já é determinada pelo Maze, garantindo determinismo.
 
-Campos de métricas (opcional): As funções também retornam (por enquanto comentado) possibilidade de métricas se desejado futuramente.
+Campos de métricas: As funções também retornam métricas de desempenho.
 
 Edge cases abordados:
 	- Labirinto vazio: Maze.from_file já impede.
@@ -306,6 +306,7 @@ def greedy_best_first(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = N
 		if current == goal:
 			break
 		visited.add(current)
+		rec.track_explored(len(visited))
 
 		# Explora vizinhos com base apenas na heurística: se h melhora, atualiza came_from e insere na fronteira (heap)
 		for nb in maze.neighbors(current):
@@ -318,12 +319,12 @@ def greedy_best_first(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = N
 				heapq.heappush(open_heap, (new_h, next(push_counter), nb))
 				rec.inc_generated()
 				rec.track_frontier(len(open_heap))
-    
-		# Falha ou sucesso: reconstruir
-		path = _reconstruct_path(came_from, start, goal)
-		if not with_metrics:
-			return path
-		return path, rec.finalize(maze, path)
+
+	# Falha ou sucesso: reconstruir
+	path = _reconstruct_path(came_from, start, goal)
+	if not with_metrics:
+		return path
+	return path, rec.finalize(maze, path)
 
 
 __all__ = ["bfs", "dfs", "astar", "greedy_best_first"]
