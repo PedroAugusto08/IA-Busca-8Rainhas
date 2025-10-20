@@ -14,9 +14,7 @@ Métricas:
 - Tempo de execução (perf_counter).
 - Nós expandidos e gerados.
 - Memória:
-  - Fronteira (pico): max_frontier
-  - Explorados (pico): max_explored
-  - Pico Memória (simultâneo): max_structures = max_t(len(fronteira_t) + len(explorados_t))
+	- Pico Memória (simultâneo): max_structures = max_t(len(fronteira_t) + len(explorados_t))
 - Completude e Otimalidade (avaliadas via BFS como oráculo).
 - Custo (len(path) - 1) e tamanho do caminho (len(path)).
 
@@ -58,8 +56,9 @@ def _reconstruct_path(came_from: Dict[Pos, Pos], start: Pos, goal: Pos) -> List[
 
 
 class MetricsRecorder:
-	#Utilitário para registrar métricas de busca de forma unificada.
-	#Mantém a contagem de nós expandidos/gerados e os picos de estruturas (fronteira e explorados) e monta o SearchMetrics no final, preservando exatamente os valores esperados pelos algoritmos atuais.
+	# Utilitário para registrar métricas de busca de forma unificada.
+	# Mantém a contagem de nós expandidos/gerados e o pico simultâneo (fronteira + explorados)
+	# e monta o SearchMetrics no final.
 	def __init__(
 		self,
 		algorithm: str,
@@ -75,8 +74,7 @@ class MetricsRecorder:
 		self.t0 = perf_counter() if enabled else 0.0
 		self.expanded = 0
 		self.generated = 0
-		self.max_frontier = initial_frontier if enabled else 0
-		self.max_explored = initial_explored if enabled else 0
+	# Não rastreamos mais picos individuais de fronteira/explorados
 		self.max_total = (initial_frontier + initial_explored) if enabled else 0
 
 	def inc_expanded(self) -> None:
@@ -87,13 +85,7 @@ class MetricsRecorder:
 		if self.enabled:
 			self.generated += 1
 
-	def track_frontier(self, size: int) -> None:
-		if self.enabled and size > self.max_frontier:
-			self.max_frontier = size
-
-	def track_explored(self, size: int) -> None:
-		if self.enabled and size > self.max_explored:
-			self.max_explored = size
+	# REMOVIDO: track_frontier/track_explored (métricas descontinuadas)
 
 	def track_total(self, frontier_size: int, explored_size: int) -> None:
 		# Pico simultâneo de estruturas (fronteira + explorados)
@@ -113,8 +105,6 @@ class MetricsRecorder:
 			time_sec=t1 - self.t0,
 			expanded=self.expanded,
 			generated=self.generated,
-			max_frontier=self.max_frontier,
-			max_explored=self.max_explored,
 			max_structures=self.max_total,
 			found=found,
 			completeness=completeness,
@@ -154,8 +144,6 @@ def bfs(maze: "Maze", with_metrics: bool = False, compute_optimality: bool = Fal
 			came_from[nb] = current
 			queue.append(nb)
 			rec.inc_generated()
-			rec.track_frontier(len(queue))
-			rec.track_explored(len(visited))
 			rec.track_total(len(queue), len(visited))
 
 	# Falha ou sucesso: reconstruir
@@ -197,8 +185,6 @@ def dfs(maze: "Maze", with_metrics: bool = False, compute_optimality: bool = Fal
 			came_from[nb] = current
 			stack.append(nb)
 			rec.inc_generated()
-			rec.track_frontier(len(stack))
-			rec.track_explored(len(visited))
 			rec.track_total(len(stack), len(visited))
 
 	# Falha ou sucesso: reconstruir
@@ -233,7 +219,7 @@ def astar(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = None, with_me
 	came_from: Dict[Pos, Pos] = {}
 	closed: set[Pos] = set()
 	push_counter = count()
-	# contadores via recorder; max_frontier inicia em 1, explored em 0
+	# inicialização para pico simultâneo: frontier inicial = 1, explored inicial = 0
 
 	start_f = heuristic(start, goal)
 	heapq.heappush(open_heap, (start_f, next(push_counter), start))
@@ -250,7 +236,6 @@ def astar(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = None, with_me
 		if current == goal:
 			break
 		closed.add(current)
-		rec.track_explored(len(closed))
 		rec.track_total(len(open_heap), len(closed))
 
 		# Explora vizinhos com base apenas na heurística: se h melhora, atualiza came_from e insere na fronteira (heap)
@@ -266,7 +251,6 @@ def astar(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = None, with_me
 				best_f[nb] = f_nb
 				heapq.heappush(open_heap, (f_nb, next(push_counter), nb))
 				rec.inc_generated()
-				rec.track_frontier(len(open_heap))
 
 	# Falha ou sucesso: reconstruir
 	path = _reconstruct_path(came_from, start, goal)
@@ -297,7 +281,7 @@ def greedy_best_first(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = N
 	came_from: Dict[Pos, Pos] = {}
 	visited: set[Pos] = set()
 	push_counter = count()
-	# contadores via recorder; max_frontier inicia em 1, explored em 0
+	# inicialização para pico simultâneo: frontier inicial = 1, explored inicial = 0
 
 	start_h = heuristic(start, goal)
 	heapq.heappush(open_heap, (start_h, next(push_counter), start))
@@ -313,7 +297,6 @@ def greedy_best_first(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = N
 		if current == goal:
 			break
 		visited.add(current)
-		rec.track_explored(len(visited))
 		rec.track_total(len(open_heap), len(visited))
 
 		# Explora vizinhos com base apenas na heurística: se h melhora, atualiza came_from e insere na fronteira (heap)
@@ -326,7 +309,6 @@ def greedy_best_first(maze: "Maze", h: Optional[Callable[[Pos, Pos], float]] = N
 				came_from[nb] = current
 				heapq.heappush(open_heap, (new_h, next(push_counter), nb))
 				rec.inc_generated()
-				rec.track_frontier(len(open_heap))
 
 	# Falha ou sucesso: reconstruir
 	path = _reconstruct_path(came_from, start, goal)
@@ -346,8 +328,6 @@ class SearchMetrics:
 	time_sec: float
 	expanded: int
 	generated: int
-	max_frontier: int
-	max_explored: int
 	max_structures: int
 	found: bool
 	completeness: Optional[bool]

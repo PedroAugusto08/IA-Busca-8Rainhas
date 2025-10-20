@@ -23,10 +23,8 @@ trabalho1/
 		01_tempo_ms.png     # Gráfico: Tempo (ms)
 		02_expandidos.png   # Gráfico: Expandidos
 		03_gerados.png      # Gráfico: Gerados
-		04_explorados.png   # Gráfico: Explorados (pico)
-		05_fronteira.png    # Gráfico: Fronteira (pico)
-		06_pico_memoria.png # Gráfico: Pico Memória (pico simultâneo)
-		07_custo.png        # Gráfico: Custo do caminho
+		04_pico_memoria.png # Gráfico: Pico Memória (pico simultâneo)
+		05_custo.png        # Gráfico: Custo do caminho
 ```
 
 ## Dependências
@@ -59,5 +57,5 @@ Reprodutibilidade:
 
 ## Como reproduzir os gráficos
 - Se `matplotlib` estiver instalado, os gráficos são gerados automaticamente após a execução do runner.
-- Arquivos PNG são salvos em `trabalho1/metrics/` com nomes por métrica (tempo_ms, expandidos, gerados, explorados, fronteira, pico_memoria, custo).
+- Arquivos PNG são salvos em `trabalho1/metrics/` com nomes por métrica (tempo_ms, expandidos, gerados, pico_memoria, custo).
 - Caso `matplotlib` não esteja instalado, os gráficos são pulados; um arquivo de aviso é salvo em `trabalho1/metrics/PLOTTING_DISABLED.txt` com instruções de instalação.

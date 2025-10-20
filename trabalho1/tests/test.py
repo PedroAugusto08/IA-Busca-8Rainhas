@@ -63,7 +63,7 @@ def main() -> int:
     def _format_table(rows: List[dict]) -> str:
         headers = [
             "Algoritmo", "Heurística", "Tempo(ms)", "Expandidos", "Gerados",
-            "Explorados", "Fronteira", "Pico Memória", "Completo", "Ótimo", "Custo", "Caminho"
+            "Pico Memória", "Completo", "Ótimo", "Custo", "Caminho"
         ]
         data = []
         for r in rows:
@@ -74,8 +74,6 @@ def main() -> int:
                 f"{m.time_sec*1000:.3f}",
                 f"{m.expanded}",
                 f"{m.generated}",
-                f"{m.max_explored}",
-                f"{m.max_frontier}",
                 f"{m.max_structures}",
                 _bool_str(m.completeness),
                 _bool_str(m.optimal),
@@ -165,9 +163,9 @@ def main() -> int:
                 except Exception:
                     plt.style.use("ggplot")
         except Exception as e:
-            # Se matplotlib não estiver disponível, registra uma dica e segue sem falhar o runner
+            # Se matplotlib não estiver disponível, registra uma sugestão e segue sem falhar o runner
             try:
-                (out_dir / "PLOTING_DISABLED.txt").write_text(
+                (out_dir / "PLOTTING_DISABLED.txt").write_text(
                     "matplotlib não encontrado. Para habilitar gráficos, instale com:\n\n"
                     "pip install matplotlib\n\n"
                     "Os gráficos são gerados automaticamente na próxima execução.",
@@ -205,8 +203,6 @@ def main() -> int:
             ("tempo_ms", "Tempo (ms)", lambda m: m.time_sec * 1000.0, False),
             ("expandidos", "Nós expandidos", lambda m: m.expanded, True),
             ("gerados", "Nós gerados", lambda m: m.generated, True),
-            ("explorados", "Explorados (pico)", lambda m: m.max_explored, True),
-            ("fronteira", "Fronteira (pico)", lambda m: m.max_frontier, True),
             ("pico_memoria", "Pico de memória (estruturas)", lambda m: m.max_structures, True),
             ("custo", "Custo do caminho", lambda m: m.path_cost, True),
         ]
