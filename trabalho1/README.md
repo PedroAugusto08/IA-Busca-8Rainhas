@@ -59,3 +59,10 @@ Reprodutibilidade:
 - Se `matplotlib` estiver instalado, os gráficos são gerados automaticamente após a execução do runner.
 - Arquivos PNG são salvos em `trabalho1/metrics/` com nomes por métrica (tempo_ms, expandidos, gerados, pico_memoria, custo).
 - Caso `matplotlib` não esteja instalado, os gráficos são pulados; um arquivo de aviso é salvo em `trabalho1/metrics/PLOTTING_DISABLED.txt` com instruções de instalação.
+
+## Observações
+- Pequenas diferenças de tempo entre execuções são normais, mesmo com o mesmo código e entrada. Os principais fatores são:
+	- Agendador do sistema operacional e carga de outros processos.
+	- Variações de frequência (turbo/thermal) da CPU e política de energia.
+	- Efeitos de cache.
+	- Coletor de lixo (GC) e sobrecustos internos do Python.
