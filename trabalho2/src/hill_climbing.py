@@ -105,9 +105,12 @@ def hill_climbing_random_restart(
 	steps_total = 0
 	best_board: Optional[Board] = None
 	best_h = float('inf')
+	conflicts_start: Optional[int] = None
 
 	for attempt in range(max_restarts + 1):
 		cur = initial_board(n)
+		if conflicts_start is None:
+			conflicts_start = conflicts(cur)
 		res = hill_climbing_sideways(
 			cur,
 			lateral_limit=lateral_limit,
@@ -128,6 +131,7 @@ def hill_climbing_random_restart(
 				"steps_total": steps_total,
 				"time_sec": t1 - t0,
 				"h_final": 0,
+				"conflicts_start": int(conflicts_start) if conflicts_start is not None else None,
 			}
 		restarts += 1
 
@@ -141,6 +145,7 @@ def hill_climbing_random_restart(
 		"steps_total": steps_total,
 		"time_sec": t1 - t0,
 		"h_final": conflicts(final_board),
+		"conflicts_start": int(conflicts_start) if conflicts_start is not None else None,
 	}
 
 

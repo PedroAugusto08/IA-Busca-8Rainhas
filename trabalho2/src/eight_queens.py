@@ -61,9 +61,19 @@ def apply(board: List[int], mv: Move) -> List[int]:
     newb[c] = r
     return newb
 
+def board_to_str(board: List[int]) -> str:
+    # Converte o tabuleiro em uma string NxN com 'Q' e '.'
+    n = len(board)
+    lines = []
+    for r in range(n):
+        row = ['Q' if board[c] == r else '.' for c in range(n)]
+        lines.append(' '.join(row))
+    return '\n'.join(lines)
+
 # Runner simples
 if __name__ == "__main__":
     n = 8
     random.seed(42)
     board = initial_board(n)
-    print("Board inicial:", board, "Conflitos:", conflicts(board))
+    print("Board inicial (vetor):", board, "Conflitos:", conflicts(board))
+    print("Board inicial (grade):\n" + board_to_str(board))
