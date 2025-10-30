@@ -80,7 +80,7 @@ def hill_climbing_basic(
 def hill_climbing_sideways(
 	board0: Board,
 	*,
-	lateral_limit: int = 20,
+	lateral_limit: int = 100,
 	max_iters: int = 1000,
 	rng: Optional[random.Random] = None,
 ) -> Dict[str, Any]:
