@@ -263,26 +263,26 @@ def _generate_plots(
 
     # Tempo(ms)
     means = [_mean(times_sw_ms), _mean(times_rr_ms)]
-    errs = [_stdev(times_sw_ms), _stdev(times_rr_ms)]
+    stds_t = [_stdev(times_sw_ms), _stdev(times_rr_ms)]
     fig, ax = plt.subplots(figsize=(7, 5))
-    bars = ax.bar(labels, means, yerr=errs, capsize=6, color=["#4C78A8", "#F58518"])
+    bars = ax.bar(labels, means, color=["#4C78A8", "#F58518"])
     ax.set_ylabel("Tempo (ms)")
     ax.set_title("Tempo médio por algoritmo (± desvio)")
-    for bar, val in zip(bars, means):
-        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height(), f"{val:.1f}", ha="center", va="bottom", fontsize=10)
+    for bar, m, s in zip(bars, means, stds_t):
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height(), f"{m:.2f} ± {s:.2f}", ha="center", va="bottom", fontsize=10)
     fig.tight_layout()
     fig.savefig(out_dir / "tempo_mean_bar.png", dpi=160)
     plt.close(fig)
 
     # Passos
     means = [_mean([float(x) for x in steps_sw]), _mean([float(x) for x in steps_rr])]
-    errs = [_stdev([float(x) for x in steps_sw]), _stdev([float(x) for x in steps_rr])]
+    stds_s = [_stdev([float(x) for x in steps_sw]), _stdev([float(x) for x in steps_rr])]
     fig, ax = plt.subplots(figsize=(7, 5))
-    bars = ax.bar(labels, means, yerr=errs, capsize=6, color=["#4C78A8", "#F58518"])
+    bars = ax.bar(labels, means, color=["#4C78A8", "#F58518"])
     ax.set_ylabel("Passos")
     ax.set_title("Passos médios por algoritmo (± desvio)")
-    for bar, val in zip(bars, means):
-        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height(), f"{val:.1f}", ha="center", va="bottom", fontsize=10)
+    for bar, m, s in zip(bars, means, stds_s):
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height(), f"{m:.2f} ± {s:.2f}", ha="center", va="bottom", fontsize=10)
     fig.tight_layout()
     fig.savefig(out_dir / "passos_mean_bar.png", dpi=160)
     plt.close(fig)
