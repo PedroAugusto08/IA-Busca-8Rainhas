@@ -67,12 +67,15 @@ def main() -> int:
         "Tabuleiro (amostra, seed=42):\n" + board_to_str(sample) +
         f"\nConflitos: {conflicts(sample)}\n\n"
     )
-    # Reaplica a seed para manter a sequência dos trials
-    random.seed(42)
-
+    
     # Opcional: também imprimir no terminal, se solicitado
     if args.show_board:
         print(sample_text)
+
+    # --- Preparar tabuleiros iniciais idênticos para todos os trials ---
+    random.seed(42)
+    initial_boards: List[List[int]] = [initial_board(n) for _ in range(T)]
+
 
     # Tabela por-trial: HC-Sideways
     headers_sw = ["Trial", "Sucesso", "Tempo(ms)", "Passos", "Laterais", "conflicts_start", "conflicts_final"]
@@ -84,7 +87,7 @@ def main() -> int:
     sum_h_final = 0
     success_cnt = 0
     for i in range(1, T + 1):
-        b0 = initial_board(n)
+        b0 = list(initial_boards[i - 1])  # mesmo tabuleiro usado pelo RR
         res = hill_climbing_sideways(b0, lateral_limit=lateral_limit, max_iters=max_iters)
         t_ms = float(res.get("time_sec", 0.0)) * 1000.0
         steps = int(res.get("steps", 0))
@@ -126,11 +129,13 @@ def main() -> int:
     sum_h_final = 0
     success_cnt = 0
     for i in range(1, T + 1):
+        b0 = list(initial_boards[i - 1])  # mesmo tabuleiro do sideways
         res = hill_climbing_random_restart(
             n,
             max_restarts=max_restarts,
-            lateral_limit=lateral_limit,
             max_iters_per_restart=max_iters,
+            rng=random,
+            initial_board_override=b0,  # <- novo parâmetro que vamos adicionar abaixo
         )
         t_ms = float(res.get("time_sec", 0.0)) * 1000.0
         steps = int(res.get("steps_total", 0))
@@ -165,7 +170,7 @@ def main() -> int:
     # Salvar tabuleiro de amostra + tabela
     metrics_dir = Path(__file__).resolve().parents[1] / "metrics"
     try:
-        metrics_dir.mkdir(parents=True, exist_ok=True)
+        metrics_dir.mkdir(parents=True, exist_ok=True) 
     except Exception:
         pass
     out_path = Path(args.out) if args.out else (metrics_dir / "metrics.txt")
