@@ -45,7 +45,7 @@ def hill_climbing_basic(
     rng: Optional[random.Random] = None,
 ) -> Dict[str, Any]:
     # Hill Climbing tradicional (sem movimentos laterais).
-    # Retorna dict: board, success, steps, time_sec, h_final.
+    # Retorna dict: board, success, steps, time_sec, conflicts_final.
     r = rng or random
     cur = list(board0)
     h_cur = conflicts(cur)
@@ -73,19 +73,19 @@ def hill_climbing_basic(
         "success": h_cur == 0,
         "steps": steps,
         "time_sec": t1 - t0,
-        "h_final": h_cur,
+        "conflicts_final": h_cur,
     }
 
 
 def hill_climbing_sideways(
 	board0: Board,
 	*,
-	lateral_limit: int = 50,
+	lateral_limit: int = 20,
 	max_iters: int = 1000,
 	rng: Optional[random.Random] = None,
 ) -> Dict[str, Any]:
-	# Hill Climbing com movimentos laterais (mesmo h) até lateral_limit.
-	# Retorna dict: board, success, steps, sideways_used, time_sec, h_final.
+    # Hill Climbing com movimentos laterais (mesmo h) até lateral_limit.
+    # Retorna dict: board, success, steps, sideways_used, time_sec, conflicts_final.
 	r = rng or random
 	cur = list(board0)
 	h_cur = conflicts(cur)
@@ -122,18 +122,18 @@ def hill_climbing_sideways(
 		"steps": steps,
 		"sideways_used": sideways_used,
 		"time_sec": t1 - t0,
-		"h_final": h_cur,
+		"conflicts_final": h_cur,
 	}
 
 def hill_climbing_random_restart(
     n: int = 8,
     *,
-    max_restarts: int = 100,
+    max_restarts: int = 50,
     max_iters_per_restart: int = 1000,
     rng: Optional[random.Random] = None,
     initial_board_override: Optional[Board] = None,
 ) -> Dict[str, Any]:
-    """Random-Restart Hill Climbing: reinicia de estados aleatórios até h==0."""
+    # Random-Restart Hill Climbing: reinicia de estados aleatórios até h==0.
     r = rng or random
     t0 = perf_counter()
 
@@ -160,7 +160,8 @@ def hill_climbing_random_restart(
         )
 
         steps_total += int(res.get("steps", 0))
-        h_cur = int(res.get("h_final", conflicts(res["board"])))
+        # Suporta tanto a chave nova (conflicts_final) quanto a antiga (h_final) por compatibilidade
+        h_cur = int(res.get("conflicts_final", res.get("h_final", conflicts(res["board"]))))
         if h_cur < best_h:
             best_h = h_cur
             best_board = list(res["board"])
@@ -173,7 +174,7 @@ def hill_climbing_random_restart(
                 "restarts": restarts,
                 "steps_total": steps_total,
                 "time_sec": t1 - t0,
-                "h_final": h_cur,
+                "conflicts_final": h_cur,
                 "conflicts_start": int(conflicts_start),
             }
 
@@ -188,7 +189,7 @@ def hill_climbing_random_restart(
         "restarts": restarts,
         "steps_total": steps_total,
         "time_sec": t1 - t0,
-        "h_final": conflicts(final_board),
+        "conflicts_final": conflicts(final_board),
         "conflicts_start": int(conflicts_start) if conflicts_start is not None else conflicts(final_board),
     }
 
@@ -197,11 +198,11 @@ def hill_climbing_random_restart(
 
 # Runner simples
 if __name__ == "__main__":
-	random.seed(42)
-	b = initial_board(8)
-	print("Inicial:", b, "h=", conflicts(b))
-	r1 = hill_climbing_sideways(b, lateral_limit=50)
-	print("HC-sideways -> success=", r1["success"], "h=", r1["h_final"], "steps=", r1["steps"])  # type: ignore[index]
-	r2 = hill_climbing_random_restart(8, max_restarts=50, lateral_limit=50)
-	print("RR-HC -> success=", r2["success"], "h=", r2["h_final"], "restarts=", r2["restarts"])  # type: ignore[index]
+    random.seed(42)
+    b = initial_board(8)
+    print("Inicial:", b, "h=", conflicts(b))
+    r1 = hill_climbing_sideways(b, lateral_limit=50)
+    print("HC-sideways -> success=", r1["success"], "h=", r1.get("conflicts_final", r1.get("h_final")), "steps=", r1["steps"])  # type: ignore[index]
+    r2 = hill_climbing_random_restart(8, max_restarts=50)
+    print("RR-HC -> success=", r2["success"], "h=", r2.get("conflicts_final", r2.get("h_final")), "restarts=", r2["restarts"])  # type: ignore[index]
 
